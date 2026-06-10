@@ -203,6 +203,24 @@ Or skip YAML entirely and build the `AgentPack` object in code — the manifest 
 4. **Glass box by default.** If you can't watch the delegation happen, you can't debug it and you can't demo it.
 5. **Evals or it didn't happen.** A team you can't test is a liability. The harness ships in the box, not as homework.
 
+## How agentpack compares
+
+These are all good tools — they optimize for different jobs:
+
+| | agentpack | CrewAI | Mastra | Langflow / Flowise |
+|---|---|---|---|---|
+| Language | TypeScript | Python | TypeScript | Visual (Python runtime) |
+| Team definition | One YAML manifest + markdown prompts | YAML (agents + tasks) + Python code | Code-first (`new Agent({...})`) | Drag-and-drop flows |
+| Live delegation UI | Built-in, demoable to non-developers | — | Studio (developer debugging) | Flow editor |
+| Expose your team **as** an MCP server | Auto-generated per team | — | — (consumes MCP tools) | — |
+| Behavioral evals | In the box — same SSE contract as the UI | External integration | External integration | — |
+| Compose a team in the browser | Yes, from the loaded tool catalog | — | — | Yes (flow paradigm) |
+| Domain templates | Full deal teams (M&A, VC, procurement) with evals | Examples | Examples | Community flows |
+
+Pick **agentpack** when the job is: *go from a YAML file to a demoable, MCP-exposed, eval-tested supervisor/specialist team in minutes, without leaving TypeScript.*
+
+Pick something else when it isn't: **LangGraph** for explicit graph control in Python (agentpack runs on LangGraph.js under the hood), **CrewAI** for Python role-based crews with the largest community, **Mastra** for code-first TS agents with RAG and workflow primitives, **Langflow/Flowise** for visual pipeline building.
+
 ## A production example
 
 **[DealSense](https://github.com/selvaonline/realestate-ai-agent)** — a commercial real estate deal-intelligence platform (multi-agent underwriting, risk scoring, IC memos) — is the flagship application of this architecture, deployed on AWS at [reagent.selvaonline.com](https://reagent.selvaonline.com). agentpack is that platform's core, extracted and generalized.
@@ -229,11 +247,13 @@ templates/
 
 ## Roadmap
 
+- [x] Multi-pack serving (one server, many teams, switchable in the UI)
+- [x] Build-your-own teams in the browser (ephemeral packs from the tool catalog)
+- [x] Light/dark theme dev UI
 - [ ] More vertical templates (equity research, insurance underwriting, claims triage)
 - [ ] `agentpack eval --judge` — LLM-as-judge scoring (faithfulness, completeness) on top of deterministic checks
 - [ ] Remote MCP servers as tool sources (`tools: mcp://...` in the manifest)
 - [ ] Embeddable network-panel web component for production UIs
-- [ ] Multi-pack serving (one server, many teams)
 - [ ] Streaming token-level answers
 
 ## About
