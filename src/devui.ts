@@ -58,6 +58,15 @@ header .right{margin-left:auto;display:flex;align-items:center;gap:10px;font-siz
 .builder input:focus,.builder textarea:focus{border-color:var(--spec)}
 .builder textarea{resize:vertical;min-height:64px;line-height:1.5}
 .brow{display:grid;grid-template-columns:1fr 2fr;gap:12px}
+.bai{border:1px dashed var(--spec);border-radius:10px;padding:12px 16px 10px;margin-bottom:16px;background:rgba(56,189,248,.04)}
+.bai label{margin-top:0}
+.bairow{display:flex;gap:10px;align-items:stretch}
+.bairow textarea{flex:1}
+.bairow .primary{background:linear-gradient(180deg,#fcd34d,#f59e0b);color:#1c1206;font-weight:700;border:none;
+  border-radius:10px;padding:0 18px;font-size:.84rem;cursor:pointer;white-space:nowrap;transition:filter .15s}
+.bairow .primary:hover{filter:brightness(1.08)}
+.bairow .primary:disabled{opacity:.6;cursor:wait}
+.bainote{font-size:.72rem;color:var(--dim);margin-top:7px;line-height:1.45}
 .spcard{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:14px;background:var(--spcardbg);position:relative}
 .spcard .spx{position:absolute;top:10px;right:12px;border:none;background:transparent;color:var(--dim);
   cursor:pointer;font-size:.9rem}
@@ -175,6 +184,15 @@ footer a{color:var(--spec);text-decoration:none}
       your agent runs live with the full network view, and the page URL becomes a shareable link.
       Agents built here expire after 24 hours. For custom <i>tools</i> and a permanent setup,
       scaffold a project with <code>npx @selvaonline/agentpack init</code>.</div>
+    <div class="bai">
+      <label>✨ Describe your agent — AI designs the team for you</label>
+      <div class="bairow">
+        <textarea id="baidesc" rows="2" maxlength="1000"
+          placeholder="e.g. A family trip planner: research destinations and weather, then build a total budget for the whole group."></textarea>
+        <button class="primary" id="bgen">✨ Generate team</button>
+      </div>
+      <div class="bainote">The AI picks specialists, writes their prompts, and selects matching tools from the catalog. Review and tweak everything below before launching.</div>
+    </div>
     <div class="brow">
       <div><label>Agent name</label><input id="bname" placeholder="my-deal-agent" maxlength="40"/></div>
       <div><label>Description</label><input id="bdesc" placeholder="What does this agent do?" maxlength="200"/></div>
@@ -222,7 +240,7 @@ footer a{color:var(--spec);text-decoration:none}
 
 <script>
 const els = {};
-for (const id of ["q","go","suprow","cols","feed","answer","abody","atitle","copy","hops","timer","toks","stats","netsub","packbar","packdesc","chips","title","dot","mcppath","edges","net","querybar","builder","bname","bdesc","bsup","bspecs","baddspec","byaml","blaunch","berr","theme","approve","apname","apquery","apok","apno"])
+for (const id of ["q","go","suprow","cols","feed","answer","abody","atitle","copy","hops","timer","toks","stats","netsub","packbar","packdesc","chips","title","dot","mcppath","edges","net","querybar","builder","bname","bdesc","bsup","bspecs","baddspec","byaml","blaunch","berr","theme","approve","apname","apquery","apok","apno","baidesc","bgen"])
   els[id] = document.getElementById(id);
 let allPacks = [], activePack = null, netData = null, dynamicEnabled = false;
 let nodeEls = {}, edgeEls = {}, hopCount = 0, t0 = 0, timerIv = null, running = false, rawAnswer = "";
@@ -382,6 +400,37 @@ els.baddspec.onclick = () => {
   if (specs.length >= 8) return;
   specs.push({ name: "", description: "", prompt: "", tools: [] });
   renderSpecs();
+};
+
+els.bgen.onclick = async () => {
+  els.berr.style.display = "none";
+  const d = els.baidesc.value.trim();
+  if (d.length < 8) {
+    els.berr.textContent = "Describe your agent in a sentence or two first.";
+    els.berr.style.display = "block";
+    return;
+  }
+  els.bgen.disabled = true; els.bgen.textContent = "Designing…";
+  try {
+    const r = await fetch("/api/suggest", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description: d }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      els.berr.textContent = j.error || "generation failed — try again";
+      els.berr.style.display = "block";
+      return;
+    }
+    els.bname.value = j.name || "";
+    els.bdesc.value = j.description || "";
+    els.bsup.value = j.supervisorInstructions || "";
+    specs = (j.specialists || []).map(s => ({
+      name: s.name, description: s.description, prompt: s.prompt,
+      tools: s.tools || [], approval: false,
+    }));
+    renderSpecs();
+  } finally {
+    els.bgen.disabled = false; els.bgen.textContent = "✨ Generate team";
+  }
 };
 
 let launchWarned = false;

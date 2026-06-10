@@ -20,7 +20,7 @@ import { mcpRouter } from "./mcp.js";
 import { defaultSupervisorPrompt } from "./manifest.js";
 import { devUiHtml } from "./devui.js";
 import { widgetJs } from "./widget.js";
-import { hasLlmKey } from "./llm.js";
+import { hasLlmKey, makeModel } from "./llm.js";
 
 export interface AgentpackServer {
   app: express.Express;
@@ -228,6 +228,87 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
         source,
       })),
     });
+  });
+
+  // AI-assisted builder: turn a plain-English description into a full team
+  // spec (name, specialists, prompts, tool picks from the catalog).
+  const suggestLimiter = rateLimit(Number(process.env.AGENTPACK_SUGGEST_LIMIT ?? 10));
+  app.post("/api/suggest", suggestLimiter, async (req, res) => {
+    if (!dynamicEnabled) {
+      res.status(403).json({ error: "dynamic packs are disabled on this server" });
+      return;
+    }
+    if (!hasLlmKey()) {
+      res.status(503).json({ error: "no LLM key configured on this server" });
+      return;
+    }
+    const description = String(req.body?.description || "").trim().slice(0, 1000);
+    if (description.length < 8) {
+      res.status(400).json({ error: "describe your agent in a sentence or two" });
+      return;
+    }
+    const catalog = Array.from(toolCatalog.entries())
+      .map(([name, { tool, source }]) => `- ${name} (from ${source}): ${tool.schema.description}`)
+      .join("\n");
+    const prompt = [
+      "You design multi-agent teams. Given a user's description of the agent they want,",
+      "produce a team spec as pure JSON (no markdown fences, no commentary):",
+      "{",
+      '  "name": "short-kebab-case-name",',
+      '  "description": "one sentence",',
+      '  "supervisorInstructions": "one or two sentences of extra guidance for the supervisor (e.g. what the final answer must always include)",',
+      '  "specialists": [',
+      '    { "name": "kebab_or_snake_case", "description": "what the supervisor sees when delegating",',
+      '      "prompt": "full system prompt for this specialist", "tools": ["tool_name"] }',
+      "  ]",
+      "}",
+      "Rules:",
+      "- 2 to 4 specialists with clearly distinct roles.",
+      "- Only pick tools from the catalog below, and only ones genuinely relevant to the user's domain. A specialist may have zero tools if its role is pure writing/synthesis.",
+      "- If NO catalog tools fit the domain, still build the team with empty tool lists and prompts that work from reasoning alone.",
+      "- Specialist prompts must instruct: search/act immediately with whatever criteria were given (all filters optional), report every field the tools return, never ask the user for more information, and be honest when data is unavailable.",
+      "",
+      "Tool catalog:",
+      catalog,
+      "",
+      "User's description of the agent they want:",
+      description,
+    ].join("\n");
+    try {
+      const out = await makeModel().invoke(prompt);
+      const text = typeof out.content === "string"
+        ? out.content
+        : (out.content as any[]).map((c) => c?.text || "").join("");
+      // Models sometimes wrap JSON in fences or prose — extract the outermost object.
+      const start = text.indexOf("{");
+      const end = text.lastIndexOf("}");
+      if (start < 0 || end <= start) throw new Error(`no JSON in model output: ${text.slice(0, 200)}`);
+      const raw = JSON.parse(text.slice(start, end + 1));
+      // Sanitize: never trust model output blindly.
+      const specialists = (Array.isArray(raw.specialists) ? raw.specialists : [])
+        .slice(0, 6)
+        .map((s: any) => ({
+          name: String(s?.name || "specialist").slice(0, 40),
+          description: String(s?.description || "").slice(0, 300),
+          prompt: String(s?.prompt || "").slice(0, 2000),
+          tools: (Array.isArray(s?.tools) ? s.tools : [])
+            .filter((t: any) => typeof t === "string" && toolCatalog.has(t)),
+        }))
+        .filter((s: any) => s.description && s.prompt);
+      if (!specialists.length) {
+        res.status(502).json({ error: "the model returned an unusable spec — try rephrasing your description" });
+        return;
+      }
+      res.json({
+        name: String(raw.name || "my-agent").slice(0, 40),
+        description: String(raw.description || description).slice(0, 200),
+        supervisorInstructions: String(raw.supervisorInstructions || "").slice(0, 500),
+        specialists,
+      });
+    } catch (e: any) {
+      console.error("[agentpack] /api/suggest failed:", e?.message || e);
+      res.status(502).json({ error: "could not generate a team spec — try rephrasing your description" });
+    }
   });
 
   const buildLimiter = rateLimit(Number(process.env.AGENTPACK_BUILD_LIMIT ?? 10));
