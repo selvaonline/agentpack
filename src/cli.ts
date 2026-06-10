@@ -80,7 +80,7 @@ Usage:
   agentpack eval [evals/cases.json]      behavioral evals against a running server
       --api-url <url>  --only <case>  --skip <case>
 `);
-      process.exit(cmd ? 1 : 0);
+      process.exit(cmd && cmd !== "--help" && cmd !== "-h" ? 1 : 0);
   }
 }
 
