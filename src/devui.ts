@@ -13,14 +13,21 @@ export function devUiHtml(packs: AgentPack[]): string {
 <title>${esc(title)} — agentpack</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E"/>
 <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script>document.documentElement.dataset.theme = localStorage.getItem("agentpack-theme") || "light";</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0b1020;--panel:#10172e;--panel2:#0d1426;--line:#1e293b;--txt:#e2e8f0;--dim:#64748b;
-  --sup:#fbbf24;--spec:#38bdf8;--tool:#94a3b8;--active:#fbbf24;--visited:#34d399;--edge:#22304a}
+:root{--bg:#f4f6fb;--panel:#ffffff;--panel2:#f1f5f9;--line:#dde5f0;--txt:#1e293b;--dim:#64748b;
+  --sup:#b45309;--spec:#0369a1;--tool:#475569;--active:#d97706;--visited:#059669;--edge:#c3cfdf;
+  --head:#0f172a;--codebg:#eef2f7;--supbg:linear-gradient(180deg,#fffbeb,#fef3c7);--spcardbg:#f8fafc;
+  --err:#dc2626;--g1:rgba(3,105,161,.05);--g2:rgba(217,119,6,.04)}
+[data-theme=dark]{--bg:#0b1020;--panel:#10172e;--panel2:#0d1426;--line:#1e293b;--txt:#e2e8f0;--dim:#64748b;
+  --sup:#fbbf24;--spec:#38bdf8;--tool:#94a3b8;--active:#fbbf24;--visited:#34d399;--edge:#22304a;
+  --head:#f1f5f9;--codebg:#1e293b;--supbg:linear-gradient(180deg,#1a2138,#141a2e);--spcardbg:rgba(13,20,38,.6);
+  --err:#f87171;--g1:rgba(56,189,248,.07);--g2:rgba(251,191,36,.05)}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:var(--txt);min-height:100vh;
-  background:var(--bg);
-  background-image:radial-gradient(1100px 500px at 15% -10%, rgba(56,189,248,.07), transparent 60%),
-    radial-gradient(900px 420px at 90% 0%, rgba(251,191,36,.05), transparent 55%)}
+  background:var(--bg);transition:background .25s,color .25s;
+  background-image:radial-gradient(1100px 500px at 15% -10%, var(--g1), transparent 60%),
+    radial-gradient(900px 420px at 90% 0%, var(--g2), transparent 55%)}
 .wrap{max-width:1100px;margin:0 auto;padding:28px 20px 60px}
 header{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
 header h1{font-size:1.4rem;letter-spacing:-.02em}
@@ -51,10 +58,10 @@ header .right{margin-left:auto;display:flex;align-items:center;gap:10px;font-siz
 .builder input:focus,.builder textarea:focus{border-color:var(--spec)}
 .builder textarea{resize:vertical;min-height:64px;line-height:1.5}
 .brow{display:grid;grid-template-columns:1fr 2fr;gap:12px}
-.spcard{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:14px;background:rgba(13,20,38,.6);position:relative}
+.spcard{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:14px;background:var(--spcardbg);position:relative}
 .spcard .spx{position:absolute;top:10px;right:12px;border:none;background:transparent;color:var(--dim);
   cursor:pointer;font-size:.9rem}
-.spcard .spx:hover{color:#f87171}
+.spcard .spx:hover{color:var(--err)}
 .toolpick{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .tpick{border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:12px;
   padding:3px 11px;font-size:.72rem;cursor:pointer;transition:all .12s}
@@ -68,7 +75,10 @@ header .right{margin-left:auto;display:flex;align-items:center;gap:10px;font-siz
 .baction .ghost{border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:10px;
   padding:10px 16px;font-size:.82rem;cursor:pointer;transition:all .15s}
 .baction .ghost:hover{color:var(--spec);border-color:var(--spec)}
-.berr{color:#f87171;font-size:.8rem;margin-top:10px;white-space:pre-line;display:none}
+.berr{color:var(--err);font-size:.8rem;margin-top:10px;white-space:pre-line;display:none}
+.theme{border:1px solid var(--line);background:var(--panel);color:var(--dim);border-radius:8px;
+  padding:3px 9px;font-size:.85rem;cursor:pointer;line-height:1.4;transition:all .15s}
+.theme:hover{color:var(--txt);border-color:var(--spec)}
 .querybar{display:flex;gap:10px;margin-bottom:10px}
 .querybar input{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:10px;
   padding:13px 16px;color:var(--txt);font-size:.95rem;outline:none;transition:border-color .15s, box-shadow .15s}
@@ -98,7 +108,7 @@ header .right{margin-left:auto;display:flex;align-items:center;gap:10px;font-siz
 .node{border:1.5px solid var(--line);border-radius:9px;padding:7px 13px;font-size:.8rem;text-align:center;
   background:var(--panel2);transition:all .25s;position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .node.sup{border-color:var(--sup);color:var(--sup);font-weight:700;display:inline-block;padding:9px 26px;
-  background:linear-gradient(180deg,#1a2138,#141a2e)}
+  background:var(--supbg)}
 .node.spec{border-color:var(--spec);color:var(--spec);font-weight:600}
 .node.tool{color:var(--tool);font-size:.72rem}
 .node.active{box-shadow:0 0 16px rgba(251,191,36,.55);border-color:var(--active)!important;color:var(--active)!important;
@@ -120,9 +130,9 @@ header .right{margin-left:auto;display:flex;align-items:center;gap:10px;font-siz
   border-radius:8px;padding:4px 12px;font-size:.74rem;cursor:pointer;transition:all .15s}
 .answer .ahead .copy:hover{color:var(--spec);border-color:var(--spec)}
 .answer .abody{padding:20px 24px;line-height:1.65;font-size:.92rem}
-.abody h1,.abody h2,.abody h3{margin:18px 0 8px;color:#f1f5f9}.abody h1{font-size:1.2rem}.abody h2{font-size:1.05rem}
+.abody h1,.abody h2,.abody h3{margin:18px 0 8px;color:var(--head)}.abody h1{font-size:1.2rem}.abody h2{font-size:1.05rem}
 .abody p,.abody ul,.abody ol{margin-bottom:10px}.abody li{margin-left:22px}
-.abody code{background:#1e293b;border-radius:4px;padding:1px 5px;font-size:.85em}
+.abody code{background:var(--codebg);border-radius:4px;padding:1px 5px;font-size:.85em}
 .abody table{border-collapse:collapse;margin:10px 0}.abody td,.abody th{border:1px solid var(--line);padding:6px 10px;font-size:.85rem}
 .abody hr{border:none;border-top:1px solid var(--line);margin:14px 0}
 footer{text-align:center;margin-top:34px;font-size:.75rem;color:var(--dim)}
@@ -135,7 +145,8 @@ footer a{color:var(--spec);text-decoration:none}
   <header>
     <h1 id="title">${esc(title)}</h1>
     <span class="fw">⚡ agentpack</span>
-    <span class="right"><span class="dot" id="dot"></span><span id="stats"></span></span>
+    <span class="right"><span class="dot" id="dot"></span><span id="stats"></span>
+      <button class="theme" id="theme" title="Toggle light/dark theme">🌙</button></span>
   </header>
 
   <div class="packbar" id="packbar" style="display:none"></div>
@@ -196,7 +207,7 @@ footer a{color:var(--spec);text-decoration:none}
 
 <script>
 const els = {};
-for (const id of ["q","go","suprow","cols","feed","answer","abody","atitle","copy","hops","timer","stats","netsub","packbar","packdesc","chips","title","dot","mcppath","edges","net","querybar","builder","bname","bdesc","bsup","bspecs","baddspec","byaml","blaunch","berr"])
+for (const id of ["q","go","suprow","cols","feed","answer","abody","atitle","copy","hops","timer","stats","netsub","packbar","packdesc","chips","title","dot","mcppath","edges","net","querybar","builder","bname","bdesc","bsup","bspecs","baddspec","byaml","blaunch","berr","theme"])
   els[id] = document.getElementById(id);
 let allPacks = [], activePack = null, netData = null, dynamicEnabled = false;
 let nodeEls = {}, edgeEls = {}, hopCount = 0, t0 = 0, timerIv = null, running = false, rawAnswer = "";
@@ -515,6 +526,15 @@ els.copy.onclick = async () => {
 };
 els.go.onclick = run;
 els.q.addEventListener("keydown", e => { if (e.key === "Enter") run(); });
+
+const themeIcon = () => els.theme.textContent = document.documentElement.dataset.theme === "dark" ? "☀️" : "🌙";
+els.theme.onclick = () => {
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem("agentpack-theme", next);
+  themeIcon();
+};
+themeIcon();
 init();
 </script>
 </body>
