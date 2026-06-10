@@ -222,7 +222,7 @@ templates/
 
 ## About
 
-Built by [Selvakumar Murugesan](https://www.linkedin.com/in/selvaonline/). Inspired by the declarative agent-network ideas in projects like Neuro SAN — rebuilt for the TypeScript ecosystem with the batteries (UI, MCP, evals) included.
+Built by [Selvakumar Murugesan](https://www.linkedin.com/in/selvaonline/). Declarative agent teams for the TypeScript ecosystem, with the batteries (UI, MCP, evals) included.
 
 **Open to opportunities** in AI engineering / agentic systems. Issues and PRs welcome — first-time contributors get same-day responses.
 
