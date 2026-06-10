@@ -1,6 +1,6 @@
 {
   "name": "@selvaonline/agentpack",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Define your AI agent team in one YAML file — get a LangGraph supervisor, a live agent-network UI, an auto-generated MCP server, and a behavioral eval harness. TypeScript, batteries included.",
   "type": "module",
   "license": "MIT",
@@ -23,7 +23,7 @@
     "typescript"
   ],
   "bin": {
-    "agentpack": "./dist/cli.js"
+    "agentpack": "dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -35,7 +35,8 @@
   },
   "files": [
     "dist",
-    "templates"
+    "templates",
+    "!**/.env"
   ],
   "engines": {
     "node": ">=20"
