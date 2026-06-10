@@ -39,3 +39,9 @@ specialists:
     tools: []
 
 tools: ./tools
+
+examples:
+  - "Evaluate Lumenly for our fund: source its profile, score founder and execution risk, size the market at 200,000 target customers and $6,000 ARPU, model the round dilution and a multiple-based valuation, check fund fit, and draft the investment memo."
+  - "Source seed-stage devtools startups from our deal flow."
+  - "Model dilution for a $4M raise on a $16M pre-money with a 10% option pool."
+  - "Is a $48M SOM big enough for venture-scale returns? Size it from 200,000 customers at $6,000 ARPU."

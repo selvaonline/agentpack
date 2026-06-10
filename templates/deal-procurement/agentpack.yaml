@@ -39,3 +39,9 @@ specialists:
     tools: []
 
 tools: ./tools
+
+examples:
+  - "Evaluate CargoLink for our APAC parcel contract at 500,000 parcels per year over 3 years: profile the vendor, score the supplier risk, give me the category intel, model the TCO, check the spend-portfolio impact, and draft the sourcing recommendation."
+  - "Find logistics vendors in our supplier base and compare their unit prices."
+  - "Model the TCO for 500,000 parcels per year at $6.10 per parcel over 3 years with $50,000 implementation."
+  - "Compare SwiftParcel and CargoLink on supplier risk."

@@ -57,6 +57,8 @@ export interface AgentPack {
   };
   specialists: SpecialistSpec[];
   tools: AgentTool[];
+  /** Example prompts surfaced as clickable chips in the dev UI. */
+  examples?: string[];
 }
 
 /** {nodes, edges} topology for visualization. */

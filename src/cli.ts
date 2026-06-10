@@ -80,18 +80,22 @@ async function main() {
     }
 
     case "dev": {
-      const manifest = positionals()[0] || "agentpack.yaml";
-      loadDotEnv(path.dirname(path.resolve(manifest)));
-      const pack = await loadManifest(manifest);
-      const { app, registry } = createServer(pack);
+      const manifests = positionals().length ? positionals() : ["agentpack.yaml"];
+      loadDotEnv(path.dirname(path.resolve(manifests[0])));
+      const packs: Awaited<ReturnType<typeof loadManifest>>[] = [];
+      for (const m of manifests) packs.push(await loadManifest(m));
+      const { app } = createServer(packs);
       const port = Number(arg("--port") || process.env.PORT || 3000);
       app.listen(port, () => {
+        const teams = packs
+          .map((p) => `   • ${p.name} — ${p.specialists.length} specialists · ${p.tools.length} tools`)
+          .join("\n");
         console.log(`
-⚡ agentpack — "${pack.name}"
-   ${pack.specialists.length} specialists · ${registry.size} tools · supervisor: ${pack.supervisor.name}
+⚡ agentpack — serving ${packs.length} team${packs.length > 1 ? "s" : ""}
+${teams}
 
    Dev UI      http://localhost:${port}
-   MCP server  http://localhost:${port}/mcp
+   MCP server  http://localhost:${port}/mcp${packs.length > 1 ? `  (per team: /mcp/<name>)` : ""}
    API         POST http://localhost:${port}/api/run
 `);
       });
@@ -115,8 +119,8 @@ async function main() {
 Usage:
   agentpack init [dir] --template <id>   scaffold a team (default template: starter)
   agentpack templates                    list available templates
-  agentpack dev [agentpack.yaml]         run the team: dev UI, MCP server, API
-      --port <n>                         (default 3000)
+  agentpack dev [manifest...]            run one or more teams: dev UI, MCP, API
+      --port <n>                         (default 3000; multiple manifests get a pack switcher)
   agentpack eval [evals/cases.json]      behavioral evals against a running server
       --api-url <url>  --only <case>  --skip <case>
 `);

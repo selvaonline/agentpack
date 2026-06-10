@@ -40,3 +40,9 @@ specialists:
     tools: []
 
 tools: ./tools
+
+examples:
+  - "Evaluate CloudFleet Logistics as an acquisition: pull its profile, score the diligence risk, give me the sector outlook, value it with a DCF and comps, check portfolio fit, and draft the IC memo."
+  - "Find logistics SaaS acquisition targets with revenue between $30M and $60M."
+  - "Score the diligence risk for a target with 14% churn, 3.4x leverage, and 9% customer concentration."
+  - "Compare CloudFleet Logistics and GridWise Energy on risk and valuation."

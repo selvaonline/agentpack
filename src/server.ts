@@ -19,8 +19,10 @@ import { hasLlmKey } from "./llm.js";
 
 export interface AgentpackServer {
   app: express.Express;
+  /** Default (first) pack's registry and pack, for backward compatibility. */
   registry: ToolRegistry;
   pack: AgentPack;
+  packs: AgentPack[];
 }
 
 /** Sliding-window rate limit per client IP. LLM runs cost real money, so the
@@ -49,24 +51,60 @@ function rateLimit(limitPerHour: number) {
   };
 }
 
-export function createServer(pack: AgentPack): AgentpackServer {
-  const registry = buildRegistry(pack);
+/** Serve one pack — or several, switchable in the UI and addressable via the
+ * `pack` query/body param on every endpoint (defaults to the first pack). */
+export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackServer {
+  const packs = Array.isArray(packOrPacks) ? packOrPacks : [packOrPacks];
+  if (packs.length === 0) throw new Error("[agentpack] createServer needs at least one pack");
+  const entries = new Map(packs.map((p) => [p.name, { pack: p, registry: buildRegistry(p) }]));
+  const defaultEntry = entries.get(packs[0].name)!;
   const app = express();
 
-  app.use("/mcp", mcpRouter(pack, registry));
+  // Default pack at /mcp (backward compatible); every pack at /mcp/<name>.
+  app.use("/mcp", mcpRouter(defaultEntry.pack, defaultEntry.registry));
+  for (const { pack, registry } of entries.values()) {
+    app.use(`/mcp/${encodeURIComponent(pack.name)}`, mcpRouter(pack, registry));
+  }
   app.use(express.json({ limit: "1mb" }));
+
+  /** Resolve the target pack from ?pack= or body.pack; falls back to default. */
+  function resolve(req: express.Request): { pack: AgentPack; registry: ToolRegistry } | undefined {
+    const name = (req.query.pack as string) || req.body?.pack;
+    if (!name) return defaultEntry;
+    return entries.get(name);
+  }
 
   app.get("/", (_req, res) => {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(devUiHtml(pack));
+    res.send(devUiHtml(packs));
   });
 
-  app.get("/api/health", (_req, res) => res.json({ ok: hasLlmKey() }));
-  app.get("/api/network", (_req, res) => res.json(networkTopology(pack)));
+  app.get("/api/health", (_req, res) => res.json({ ok: hasLlmKey(), packs: packs.map((p) => p.name) }));
 
-  app.get("/api/tools", (_req, res) => {
+  app.get("/api/packs", (_req, res) => {
     res.json({
-      tools: registry.list().map((t) => ({
+      packs: packs.map((p) => ({
+        name: p.name,
+        description: p.description || "",
+        supervisor: p.supervisor.name,
+        specialists: p.specialists.length,
+        tools: p.tools.length,
+        examples: p.examples || [],
+      })),
+    });
+  });
+
+  app.get("/api/network", (req, res) => {
+    const entry = resolve(req);
+    if (!entry) { res.status(404).json({ error: "unknown pack" }); return; }
+    res.json(networkTopology(entry.pack));
+  });
+
+  app.get("/api/tools", (req, res) => {
+    const entry = resolve(req);
+    if (!entry) { res.status(404).json({ error: "unknown pack" }); return; }
+    res.json({
+      tools: entry.registry.list().map((t) => ({
         name: t.schema.name,
         description: t.schema.description,
         category: t.category || "tool",
@@ -76,8 +114,10 @@ export function createServer(pack: AgentPack): AgentpackServer {
   });
 
   app.post("/api/tools/execute", async (req, res) => {
+    const entry = resolve(req);
+    if (!entry) { res.status(404).json({ ok: false, error: "unknown pack" }); return; }
     const { tool: toolName, args = {} } = req.body || {};
-    const reg = registry.get(toolName);
+    const reg = entry.registry.get(toolName);
     if (!reg) {
       res.status(404).json({ ok: false, error: `unknown tool: ${toolName}` });
       return;
@@ -92,6 +132,9 @@ export function createServer(pack: AgentPack): AgentpackServer {
 
   const runLimiter = rateLimit(Number(process.env.AGENTPACK_RUN_LIMIT ?? 30));
   app.post("/api/run", runLimiter, (req, res) => {
+    const entry = resolve(req);
+    if (!entry) { res.status(404).json({ error: "unknown pack" }); return; }
+    const { pack, registry } = entry;
     const { query, threadId: clientThreadId } = req.body || {};
     if (!query || typeof query !== "string") {
       res.status(400).json({ error: "query required" });
@@ -101,13 +144,13 @@ export function createServer(pack: AgentPack): AgentpackServer {
     const threadId = (typeof clientThreadId === "string" && /^[\w-]{4,64}$/.test(clientThreadId))
       ? clientThreadId
       : runId;
-    res.json({ runId, threadId });
+    res.json({ runId, threadId, pack: pack.name });
 
     (async () => {
       const emit = (kind: string, payload: Record<string, unknown> = {}) =>
         publish(runId, { kind, runId, t: Date.now(), ...payload });
       await new Promise((r) => setTimeout(r, 200));
-      emit("run_started", { query });
+      emit("run_started", { query, pack: pack.name });
       emit("thinking", { text: `${pack.supervisor.name} is planning the work...` });
       try {
         const { answer, hops } = await runSupervisor(pack, registry, query, runId, emit, threadId);
@@ -138,5 +181,5 @@ export function createServer(pack: AgentPack): AgentpackServer {
     req.on("close", unsubscribe);
   });
 
-  return { app, registry, pack };
+  return { app, registry: defaultEntry.registry, pack: defaultEntry.pack, packs };
 }

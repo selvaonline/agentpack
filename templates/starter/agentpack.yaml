@@ -23,3 +23,8 @@ specialists:
     tools: []
 
 tools: ./tools
+
+examples:
+  - "Plan a 5-day trip to Japan in spring on a $3000 budget: research the destination, estimate the costs, and write a day-by-day itinerary."
+  - "What would a 7-day mid-range trip to Italy cost for 2 people?"
+  - "Where should I go to see the northern lights, and what will the weather be like?"

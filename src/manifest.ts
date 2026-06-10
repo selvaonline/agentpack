@@ -21,6 +21,8 @@ interface Manifest {
   specialists: ManifestSpecialist[];
   /** Directory or list of files containing tool modules. */
   tools?: string | string[];
+  /** Example prompts shown as clickable chips in the dev UI. */
+  examples?: string[];
 }
 
 /** Resolve a prompt field: inline text, or a relative path to a text file. */
@@ -134,5 +136,6 @@ export async function loadManifest(manifestPath: string): Promise<AgentPack> {
     supervisor: { name: supervisorName, prompt: supervisorPrompt },
     specialists,
     tools,
+    examples: Array.isArray(m.examples) ? m.examples.filter((e) => typeof e === "string") : undefined,
   };
 }
