@@ -238,9 +238,12 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
     }
     const b = req.body || {};
     const problems: string[] = [];
-    const slug = (s: unknown) => typeof s === "string" && /^[a-z0-9][a-z0-9-_]{1,40}$/i.test(s);
+    // Normalize human input ("San Antonio Trip" → "san-antonio-trip") instead of rejecting it.
+    const slugify = (s: unknown) => String(s ?? "").trim().toLowerCase()
+      .replace(/[^a-z0-9-_]+/g, "-").replace(/-{2,}/g, "-").replace(/^[-_]+|[-_]+$/g, "").slice(0, 40);
+    const slug = (s: unknown) => /^[a-z0-9][a-z0-9-_]{1,39}$/.test(slugify(s));
 
-    if (!slug(b.name)) problems.push("name must be 2-40 chars (letters, digits, - or _)");
+    if (!slug(b.name)) problems.push("name must contain at least 2 letters or digits");
     if (!Array.isArray(b.specialists) || b.specialists.length === 0) problems.push("at least one specialist required");
     if (Array.isArray(b.specialists) && b.specialists.length > 8) problems.push("max 8 specialists");
 
@@ -257,7 +260,7 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
         if (!toolCatalog.has(t)) problems.push(`specialist ${i + 1}: unknown tool "${t}"`);
       }
       return {
-        name: String(s?.name || ""),
+        name: slugify(s?.name),
         description: String(s?.description || "").trim(),
         prompt: String(s?.prompt || "").trim(),
         tools,
@@ -283,10 +286,12 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
     }
 
     const spec: CustomPackSpec = {
-      name: String(b.name).toLowerCase(),
-      title: typeof b.title === "string" && b.title.trim() ? b.title.trim().slice(0, 60) : undefined,
+      name: slugify(b.name),
+      // The user's original (pre-slug) name makes a natural display title.
+      title: typeof b.title === "string" && b.title.trim() ? b.title.trim().slice(0, 60)
+        : String(b.name).trim() !== slugify(b.name) ? String(b.name).trim().slice(0, 60) : undefined,
       description: typeof b.description === "string" && b.description.trim() ? b.description.slice(0, 200) : undefined,
-      supervisorName: slug(b.supervisor?.name) ? String(b.supervisor.name).toLowerCase() : "supervisor",
+      supervisorName: slug(b.supervisor?.name) ? slugify(b.supervisor.name) : "supervisor",
       supervisorInstructions: typeof b.supervisor?.instructions === "string" && b.supervisor.instructions.trim()
         ? b.supervisor.instructions.trim().slice(0, 2000)
         : undefined,

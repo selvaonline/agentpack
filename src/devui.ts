@@ -386,8 +386,12 @@ els.blaunch.onclick = async () => {
   switchPack(j.name);
 };
 
+const slugify = s => s.trim().toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/-{2,}/g, "-").replace(/^[-_]+|[-_]+$/g, "").slice(0, 40);
+
 els.byaml.onclick = async () => {
-  const y = ["name: " + (els.bname.value.trim() || "my-agent")];
+  const raw = els.bname.value.trim();
+  const y = ["name: " + (slugify(raw) || "my-agent")];
+  if (raw && slugify(raw) !== raw) y.push("title: " + JSON.stringify(raw));
   if (els.bdesc.value.trim()) y.push("description: " + JSON.stringify(els.bdesc.value.trim()));
   y.push("", "specialists:");
   for (const s of specs) {
