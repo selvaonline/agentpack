@@ -25,6 +25,8 @@ Multi-agent frameworks give you orchestration primitives and a blank screen. Eve
 | Tools — plain TS objects | Auto-generated MCP server (every tool, schemas derived, zero wrappers) |
 | Eval cases — JSON | Behavioral eval harness: routing, completeness, refusal, latency budgets |
 
+**Live demo:** [agentpack.selvaonline.com](https://agentpack.selvaonline.com) — the `deal-ma` template running on AWS: ask it to evaluate an acquisition and watch the six-agent network work. Its MCP server is public too: `https://agentpack.selvaonline.com/mcp`.
+
 ## Five minutes to a running team
 
 ```bash
