@@ -6,9 +6,9 @@
 [![Node >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](package.json)
 [![Built on LangGraph.js](https://img.shields.io/badge/orchestration-LangGraph.js-blue)](https://langchain-ai.github.io/langgraphjs/)
 
-![agentpack dev UI — live agent network during a run](docs/assets/devui-live.png)
+![agentpack dev UI — live agent network during a run](docs/assets/ui-live.png)
 
-*The built-in dev UI during a live run: the supervisor delegates across specialists, tools glow as they execute, every hop is streamed and counted. You write none of this.*
+*The built-in dev UI during a live run: switch between teams, click an example prompt, and watch the supervisor delegate across the network — animated dotted connectors trace every delegation, tools glow as they execute, every hop is streamed and counted. You write none of this.*
 
 ---
 
