@@ -137,7 +137,7 @@ header .right{margin-left:auto;display:flex;align-items:center;gap:10px;font-siz
 .abody hr{border:none;border-top:1px solid var(--line);margin:14px 0}
 footer{text-align:center;margin-top:34px;font-size:.75rem;color:var(--dim)}
 footer a{color:var(--spec);text-decoration:none}
-@media (max-width:760px){.cols{grid-auto-flow:row;grid-template-columns:repeat(2,1fr)}#edges{display:none}}
+@media (max-width:760px){.cols{grid-auto-flow:row;grid-template-columns:repeat(2,1fr);row-gap:26px}}
 </style>
 </head>
 <body>
