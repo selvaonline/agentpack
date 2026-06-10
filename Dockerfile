@@ -12,7 +12,7 @@ RUN npm run build
 
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV AGENTPACK_MANIFEST="templates/deal-ma/agentpack.yaml templates/deal-vc/agentpack.yaml templates/deal-procurement/agentpack.yaml templates/starter/agentpack.yaml"
+ENV AGENTPACK_MANIFEST="templates/deal-ma/agentpack.yaml templates/deal-vc/agentpack.yaml templates/deal-procurement/agentpack.yaml templates/equity-research/agentpack.yaml templates/claims-triage/agentpack.yaml templates/support-triage/agentpack.yaml templates/starter/agentpack.yaml"
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
