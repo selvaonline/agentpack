@@ -2,6 +2,7 @@
 # The six-role deal lifecycle: source → risk → market → model → fit → memo.
 # Reshape the team by adding/removing a specialist block and restarting.
 name: ma-deal-team
+title: M&A Deal Agent
 description: M&A acquisition team — target screening, diligence risk, industry outlook, valuation, portfolio fit, and IC memos.
 
 supervisor:

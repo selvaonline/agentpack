@@ -1,5 +1,6 @@
 # agentpack.yaml — your agent team, declared
 name: trip-planner
+title: Trip Planner Agent
 description: A travel-planning agent team (agentpack starter example)
 
 supervisor:

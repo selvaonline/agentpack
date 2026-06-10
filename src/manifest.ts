@@ -16,6 +16,8 @@ interface ManifestSpecialist {
 
 interface Manifest {
   name: string;
+  /** Display name for the UI (e.g. "M&A Deal Agent"). */
+  title?: string;
   description?: string;
   supervisor?: { name?: string; prompt?: string };
   specialists: ManifestSpecialist[];
@@ -137,6 +139,7 @@ export async function loadManifest(manifestPath: string): Promise<AgentPack> {
 
   return {
     name: m.name,
+    title: typeof m.title === "string" ? m.title : undefined,
     description: m.description,
     supervisor: { name: supervisorName, prompt: supervisorPrompt },
     specialists,

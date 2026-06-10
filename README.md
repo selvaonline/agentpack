@@ -92,6 +92,7 @@ The supervisor, the network UI, the MCP server, and the eval harness all pick up
 ```yaml
 # agentpack.yaml
 name: trip-planner
+title: Trip Planner Agent      # display name for the UI (optional)
 
 supervisor:
   name: trip_advisor

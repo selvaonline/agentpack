@@ -1,6 +1,7 @@
 # agentpack.yaml — procurement sourcing team
 # Same six-role deal lifecycle — sourcing decisions instead of investments.
 name: procurement-deal-team
+title: Procurement Deal Agent
 description: Procurement sourcing team — vendor scouting, supplier risk, category intel, TCO modeling, spend-portfolio fit, and sourcing recommendations.
 
 supervisor:

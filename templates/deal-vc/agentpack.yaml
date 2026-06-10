@@ -1,6 +1,7 @@
 # agentpack.yaml — venture capital deal team
 # Same six-role deal lifecycle as M&A — different domain, different tools.
 name: vc-deal-team
+title: VC Deal Agent
 description: VC investment team — startup sourcing, founder/market risk, market sizing, round modeling, fund fit, and investment memos.
 
 supervisor:

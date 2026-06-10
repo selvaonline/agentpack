@@ -4,7 +4,7 @@
 import type { AgentPack } from "./types.js";
 
 export function devUiHtml(packs: AgentPack[]): string {
-  const title = packs.length > 1 ? "agentpack" : packs[0].name;
+  const title = packs.length > 1 ? "agentpack" : packs[0].title || packs[0].name;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -148,13 +148,13 @@ footer a{color:var(--spec);text-decoration:none}
   <div class="chips" id="chips"></div>
 
   <div class="builder" id="builder">
-    <div class="bhead">🛠️ Build your own team</div>
+    <div class="bhead">🛠️ Build your own agent</div>
     <div class="bsub">Define your supervisor and specialists, assign them tools from the catalog below, and launch —
-      your team runs live with the full network view. Teams built here are ephemeral (they expire after 2 hours).
+      your agent runs live with the full network view. Agents built here are ephemeral (they expire after 2 hours).
       For custom <i>tools</i> and a permanent setup, scaffold a project with <code>npx agentpack init</code>.</div>
     <div class="brow">
-      <div><label>Team name</label><input id="bname" placeholder="my-deal-team" maxlength="40"/></div>
-      <div><label>Description</label><input id="bdesc" placeholder="What does this team do?" maxlength="200"/></div>
+      <div><label>Agent name</label><input id="bname" placeholder="my-deal-agent" maxlength="40"/></div>
+      <div><label>Description</label><input id="bdesc" placeholder="What does this agent do?" maxlength="200"/></div>
     </div>
     <label>Supervisor instructions (optional)</label>
     <textarea id="bsup" rows="2" placeholder="Extra guidance for the supervisor, e.g. 'Always end with a go / no-go recommendation.'"></textarea>
@@ -163,7 +163,7 @@ footer a{color:var(--spec);text-decoration:none}
       <button class="ghost" id="baddspec">＋ Add specialist</button>
       <span style="flex:1"></span>
       <button class="ghost" id="byaml">Copy as agentpack.yaml</button>
-      <button class="primary" id="blaunch">🚀 Launch team</button>
+      <button class="primary" id="blaunch">🚀 Launch agent</button>
     </div>
     <div class="berr" id="berr"></div>
   </div>
@@ -203,6 +203,7 @@ let nodeEls = {}, edgeEls = {}, hopCount = 0, t0 = 0, timerIv = null, running = 
 let toolCat = [], specs = [];
 
 const pretty = s => s.replace(/[_-]/g," ").replace(/\\b\\w/g, c => c.toUpperCase());
+const label = p => p.title || pretty(p.name);
 
 async function init() {
   const data = await (await fetch("/api/packs")).json();
@@ -218,8 +219,8 @@ function renderTabs() {
   for (const p of allPacks) {
     const b = document.createElement("button");
     b.className = "packtab" + (p.custom ? " custom" : "");
-    b.textContent = pretty(p.name); b.dataset.pack = p.name;
-    if (p.custom) b.title = "Custom team built in the browser (ephemeral)";
+    b.textContent = label(p); b.dataset.pack = p.name;
+    if (p.custom) b.title = "Custom agent built in the browser (ephemeral)";
     b.onclick = () => { if (!running) switchPack(p.name); };
     els.packbar.appendChild(b);
   }
@@ -235,8 +236,8 @@ async function switchPack(name) {
   activePack = allPacks.find(p => p.name === name);
   sessionStorage.setItem("agentpack-active", name);
   for (const b of els.packbar.children) b.classList.toggle("on", b.dataset.pack === name);
-  els.title.textContent = pretty(name);
-  els.packdesc.textContent = activePack.description + (activePack.custom ? " · custom team (expires in ~2h)" : "");
+  els.title.textContent = label(activePack);
+  els.packdesc.textContent = activePack.description + (activePack.custom ? " · custom agent (expires in ~2h)" : "");
   els.mcppath.textContent = allPacks.length > 1 ? "/mcp/" + name : "/mcp";
   els.builder.style.display = "none";
   els.querybar.style.display = "flex"; els.net.style.display = "block";
@@ -255,7 +256,7 @@ async function showBuilder() {
   els.builder.style.display = "block";
   els.title.textContent = "Build Your Own";
   if (!toolCat.length) toolCat = (await (await fetch("/api/toolcatalog")).json()).tools;
-  els.packdesc.textContent = "Compose a new agent team from " + toolCat.length + " available tools — no code required.";
+  els.packdesc.textContent = "Compose a new agent from " + toolCat.length + " available tools — no code required.";
   if (!specs.length) { prefillSpecs(); renderSpecs(); }
 }
 
@@ -326,13 +327,13 @@ els.blaunch.onclick = async () => {
   els.blaunch.disabled = true; els.blaunch.textContent = "Launching…";
   const r = await fetch("/api/packs", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      name: els.bname.value.trim() || "my-team",
+      name: els.bname.value.trim() || "my-agent",
       description: els.bdesc.value.trim(),
       supervisor: { instructions: els.bsup.value.trim() },
       specialists: specs,
     }) });
   const j = await r.json().catch(() => ({}));
-  els.blaunch.disabled = false; els.blaunch.textContent = "🚀 Launch team";
+  els.blaunch.disabled = false; els.blaunch.textContent = "🚀 Launch agent";
   if (!r.ok) {
     els.berr.textContent = (j.problems || [j.error || "launch failed"]).join("\\n");
     els.berr.style.display = "block";
@@ -344,7 +345,7 @@ els.blaunch.onclick = async () => {
 };
 
 els.byaml.onclick = async () => {
-  const y = ["name: " + (els.bname.value.trim() || "my-team")];
+  const y = ["name: " + (els.bname.value.trim() || "my-agent")];
   if (els.bdesc.value.trim()) y.push("description: " + JSON.stringify(els.bdesc.value.trim()));
   y.push("", "specialists:");
   for (const s of specs) {
@@ -482,7 +483,7 @@ async function run() {
       es.close();
       finishRun(ev.ok);
       if (rawAnswer) {
-        els.atitle.textContent = "Final Report — " + pretty(activePack.name);
+        els.atitle.textContent = "Final Report — " + label(activePack);
         els.answer.style.display = "block";
         els.abody.innerHTML = marked.parse(rawAnswer);
         els.answer.scrollIntoView({ behavior: "smooth", block: "nearest" });

@@ -128,6 +128,7 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
       dynamicEnabled,
       packs: Array.from(entries.values()).map(({ pack: p, custom }) => ({
         name: p.name,
+        title: p.title || "",
         description: p.description || "",
         supervisor: p.supervisor.name,
         specialists: p.specialists.length,
@@ -210,6 +211,7 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
     }
     const pack: AgentPack = {
       name,
+      title: typeof b.title === "string" && b.title.trim() ? b.title.trim().slice(0, 60) : undefined,
       description: typeof b.description === "string" && b.description.trim()
         ? b.description.slice(0, 200)
         : "Custom team (built in the browser)",

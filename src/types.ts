@@ -50,6 +50,8 @@ export interface SpecialistSpec {
 /** A complete agent team, ready to serve. */
 export interface AgentPack {
   name: string;
+  /** Display name for the UI (e.g. "M&A Deal Agent"); defaults to a prettified name. */
+  title?: string;
   description?: string;
   supervisor: {
     name: string;
