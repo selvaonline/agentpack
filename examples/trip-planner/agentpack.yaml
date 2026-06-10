@@ -1,0 +1,25 @@
+# agentpack.yaml — your agent team, declared
+name: trip-planner
+description: A travel-planning agent team (agentpack starter example)
+
+supervisor:
+  name: trip_advisor
+  # prompt: ./prompts/supervisor.md   # optional — a sensible default is generated
+
+specialists:
+  - name: destination_scout
+    description: Researches destinations, attractions, and seasonal weather.
+    prompt: ./prompts/destination_scout.md
+    tools: [search_destinations, get_weather]
+
+  - name: budget_planner
+    description: Estimates trip costs and builds budget breakdowns.
+    prompt: ./prompts/budget_planner.md
+    tools: [estimate_costs]
+
+  - name: itinerary_writer
+    description: Writes polished day-by-day itineraries from the team's findings.
+    prompt: ./prompts/itinerary_writer.md
+    tools: []
+
+tools: ./tools

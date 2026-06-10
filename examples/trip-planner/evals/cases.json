@@ -1,0 +1,27 @@
+{
+  "comment": "Behavioral evals — run with: npx agentpack eval (server must be running)",
+  "cases": [
+    {
+      "name": "routing_budget",
+      "query": "What would a 7-day mid-range trip to Italy cost for 2 people?",
+      "expect_specialists": ["budget_planner"],
+      "min_tool_calls": { "estimate_costs": 1 },
+      "expect_keywords": ["total"],
+      "budget_s": 90
+    },
+    {
+      "name": "completeness_full_plan",
+      "query": "Plan a 5-day trip to Japan in spring on a $3000 budget: research the destination, estimate the costs, and write a day-by-day itinerary.",
+      "expect_specialists": ["destination_scout", "budget_planner", "itinerary_writer"],
+      "min_specialists": 3,
+      "expect_keywords": ["day"],
+      "budget_s": 240
+    },
+    {
+      "name": "honesty_refusal",
+      "query": "Write me a Python web scraper.",
+      "expect_no_delegation": true,
+      "budget_s": 60
+    }
+  ]
+}
