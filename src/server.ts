@@ -14,6 +14,7 @@ import { buildRegistry, networkTopology, ToolRegistry } from "./registry.js";
 import { runSupervisor } from "./supervisor.js";
 import { publish, subscribe, scheduleCleanup } from "./events.js";
 import { mcpRouter } from "./mcp.js";
+import { defaultSupervisorPrompt } from "./manifest.js";
 import { devUiHtml } from "./devui.js";
 import { hasLlmKey } from "./llm.js";
 
@@ -51,24 +52,64 @@ function rateLimit(limitPerHour: number) {
   };
 }
 
+interface PackEntry {
+  pack: AgentPack;
+  registry: ToolRegistry;
+  custom?: boolean;
+  createdAt?: number;
+  /** Lazily-created MCP router for dynamic (browser-built) packs. */
+  mcp?: express.Router;
+}
+
+const DYNAMIC_PACK_TTL_MS = 2 * 60 * 60 * 1000;
+const DYNAMIC_PACK_MAX = 50;
+
 /** Serve one pack — or several, switchable in the UI and addressable via the
- * `pack` query/body param on every endpoint (defaults to the first pack). */
+ * `pack` query/body param on every endpoint (defaults to the first pack).
+ * Visitors can also compose ephemeral custom teams from the loaded tool
+ * catalog via POST /api/packs (disable with AGENTPACK_DYNAMIC=0). */
 export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackServer {
   const packs = Array.isArray(packOrPacks) ? packOrPacks : [packOrPacks];
   if (packs.length === 0) throw new Error("[agentpack] createServer needs at least one pack");
-  const entries = new Map(packs.map((p) => [p.name, { pack: p, registry: buildRegistry(p) }]));
+  const entries = new Map<string, PackEntry>(
+    packs.map((p) => [p.name, { pack: p, registry: buildRegistry(p) }])
+  );
   const defaultEntry = entries.get(packs[0].name)!;
+  const dynamicEnabled = process.env.AGENTPACK_DYNAMIC !== "0";
+
+  // Union of every static pack's tools — what custom teams can be built from.
+  const toolCatalog = new Map<string, { tool: (typeof packs)[0]["tools"][0]; source: string }>();
+  for (const p of packs) {
+    for (const t of p.tools) {
+      if (!toolCatalog.has(t.schema.name)) toolCatalog.set(t.schema.name, { tool: t, source: p.name });
+    }
+  }
+
+  function evictExpired() {
+    const now = Date.now();
+    for (const [name, e] of entries) {
+      if (e.custom && e.createdAt && now - e.createdAt > DYNAMIC_PACK_TTL_MS) entries.delete(name);
+    }
+  }
+
   const app = express();
 
-  // Default pack at /mcp (backward compatible); every pack at /mcp/<name>.
+  // Default pack at /mcp (backward compatible); every static pack at /mcp/<name>.
   app.use("/mcp", mcpRouter(defaultEntry.pack, defaultEntry.registry));
   for (const { pack, registry } of entries.values()) {
     app.use(`/mcp/${encodeURIComponent(pack.name)}`, mcpRouter(pack, registry));
   }
+  // Dynamic (browser-built) packs get their MCP route resolved at request time.
+  app.use("/mcp/:packName", (req, res, next) => {
+    const e = entries.get(req.params.packName);
+    if (!e?.custom || !e.mcp) return next();
+    e.mcp(req, res, next);
+  });
   app.use(express.json({ limit: "1mb" }));
 
   /** Resolve the target pack from ?pack= or body.pack; falls back to default. */
-  function resolve(req: express.Request): { pack: AgentPack; registry: ToolRegistry } | undefined {
+  function resolve(req: express.Request): PackEntry | undefined {
+    evictExpired();
     const name = (req.query.pack as string) || req.body?.pack;
     if (!name) return defaultEntry;
     return entries.get(name);
@@ -82,16 +123,110 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
   app.get("/api/health", (_req, res) => res.json({ ok: hasLlmKey(), packs: packs.map((p) => p.name) }));
 
   app.get("/api/packs", (_req, res) => {
+    evictExpired();
     res.json({
-      packs: packs.map((p) => ({
+      dynamicEnabled,
+      packs: Array.from(entries.values()).map(({ pack: p, custom }) => ({
         name: p.name,
         description: p.description || "",
         supervisor: p.supervisor.name,
         specialists: p.specialists.length,
         tools: p.tools.length,
         examples: p.examples || [],
+        custom: Boolean(custom),
       })),
     });
+  });
+
+  app.get("/api/toolcatalog", (_req, res) => {
+    res.json({
+      tools: Array.from(toolCatalog.entries()).map(([name, { tool, source }]) => ({
+        name,
+        description: tool.schema.description,
+        category: tool.category || "tool",
+        source,
+      })),
+    });
+  });
+
+  const buildLimiter = rateLimit(Number(process.env.AGENTPACK_BUILD_LIMIT ?? 10));
+  app.post("/api/packs", buildLimiter, (req, res) => {
+    if (!dynamicEnabled) {
+      res.status(403).json({ error: "dynamic packs are disabled on this server" });
+      return;
+    }
+    const b = req.body || {};
+    const problems: string[] = [];
+    const slug = (s: unknown) => typeof s === "string" && /^[a-z0-9][a-z0-9-_]{1,40}$/i.test(s);
+
+    if (!slug(b.name)) problems.push("name must be 2-40 chars (letters, digits, - or _)");
+    if (!Array.isArray(b.specialists) || b.specialists.length === 0) problems.push("at least one specialist required");
+    if (Array.isArray(b.specialists) && b.specialists.length > 8) problems.push("max 8 specialists");
+
+    const specialists = (Array.isArray(b.specialists) ? b.specialists : []).map((s: any, i: number) => {
+      if (!slug(s?.name)) problems.push(`specialist ${i + 1}: invalid name`);
+      if (typeof s?.description !== "string" || !s.description.trim() || s.description.length > 300) {
+        problems.push(`specialist ${i + 1}: description required (max 300 chars)`);
+      }
+      if (typeof s?.prompt !== "string" || !s.prompt.trim() || s.prompt.length > 4000) {
+        problems.push(`specialist ${i + 1}: prompt required (max 4000 chars)`);
+      }
+      const tools: string[] = Array.isArray(s?.tools) ? s.tools : [];
+      for (const t of tools) {
+        if (!toolCatalog.has(t)) problems.push(`specialist ${i + 1}: unknown tool "${t}"`);
+      }
+      return {
+        name: String(s?.name || ""),
+        description: String(s?.description || "").trim(),
+        prompt: String(s?.prompt || "").trim(),
+        tools,
+      };
+    });
+
+    if (problems.length) {
+      res.status(400).json({ error: "invalid team", problems });
+      return;
+    }
+
+    evictExpired();
+    if (Array.from(entries.values()).filter((e) => e.custom).length >= DYNAMIC_PACK_MAX) {
+      // evict the oldest custom pack
+      const oldest = Array.from(entries.entries())
+        .filter(([, e]) => e.custom)
+        .sort((a, b) => (a[1].createdAt || 0) - (b[1].createdAt || 0))[0];
+      if (oldest) entries.delete(oldest[0]);
+    }
+
+    // de-collide against existing packs
+    let name = String(b.name).toLowerCase();
+    let n = 2;
+    while (entries.has(name)) name = `${String(b.name).toLowerCase()}-${n++}`;
+
+    const usedTools = new Set<string>(specialists.flatMap((s: { tools: string[] }) => s.tools));
+    const supName = slug(b.supervisor?.name) ? String(b.supervisor.name).toLowerCase() : "supervisor";
+    let supPrompt = defaultSupervisorPrompt(supName, specialists);
+    if (typeof b.supervisor?.instructions === "string" && b.supervisor.instructions.trim()) {
+      supPrompt += `\n\nAdditional instructions:\n${b.supervisor.instructions.trim().slice(0, 2000)}`;
+    }
+    const pack: AgentPack = {
+      name,
+      description: typeof b.description === "string" && b.description.trim()
+        ? b.description.slice(0, 200)
+        : "Custom team (built in the browser)",
+      supervisor: { name: supName, prompt: supPrompt },
+      specialists,
+      tools: Array.from(usedTools).map((t) => toolCatalog.get(t)!.tool),
+      examples: [],
+    };
+
+    try {
+      const registry = buildRegistry(pack);
+      entries.set(name, { pack, registry, custom: true, createdAt: Date.now(), mcp: mcpRouter(pack, registry) });
+    } catch (e: any) {
+      res.status(400).json({ error: e?.message || String(e) });
+      return;
+    }
+    res.json({ ok: true, name, expiresInMinutes: DYNAMIC_PACK_TTL_MS / 60000 });
   });
 
   app.get("/api/network", (req, res) => {

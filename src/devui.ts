@@ -36,7 +36,39 @@ header .right{margin-left:auto;display:flex;align-items:center;gap:10px;font-siz
 .packtab:hover{color:var(--txt);transform:translateY(-1px)}
 .packtab.on{border-color:var(--spec);color:var(--spec);font-weight:700;
   box-shadow:0 0 0 1px rgba(56,189,248,.25), 0 4px 16px -8px rgba(56,189,248,.5)}
+.packtab.build{border-style:dashed;color:var(--sup)}
+.packtab.build.on{border-color:var(--sup);color:var(--sup);
+  box-shadow:0 0 0 1px rgba(251,191,36,.25), 0 4px 16px -8px rgba(251,191,36,.5)}
+.packtab.custom{border-style:dashed}
 .packdesc{font-size:.82rem;color:var(--dim);margin-bottom:14px;min-height:1.2em}
+.builder{display:none;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:22px;margin-bottom:20px}
+.builder .bhead{font-size:1rem;font-weight:700;margin-bottom:4px}
+.builder .bsub{font-size:.8rem;color:var(--dim);margin-bottom:16px;line-height:1.5}
+.builder label{display:block;font-size:.72rem;color:var(--dim);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.04em}
+.builder input,.builder textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;
+  padding:9px 12px;color:var(--txt);font-size:.86rem;outline:none;font-family:inherit;transition:border-color .15s}
+.builder input:focus,.builder textarea:focus{border-color:var(--spec)}
+.builder textarea{resize:vertical;min-height:64px;line-height:1.5}
+.brow{display:grid;grid-template-columns:1fr 2fr;gap:12px}
+.spcard{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:14px;background:rgba(13,20,38,.6);position:relative}
+.spcard .spx{position:absolute;top:10px;right:12px;border:none;background:transparent;color:var(--dim);
+  cursor:pointer;font-size:.9rem}
+.spcard .spx:hover{color:#f87171}
+.toolpick{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tpick{border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:12px;
+  padding:3px 11px;font-size:.72rem;cursor:pointer;transition:all .12s}
+.tpick:hover{color:var(--txt)}
+.tpick.on{border-color:var(--spec);color:var(--spec);background:rgba(56,189,248,.08)}
+.baction{display:flex;gap:10px;margin-top:18px;align-items:center;flex-wrap:wrap}
+.baction .primary{background:linear-gradient(180deg,#fcd34d,#f59e0b);color:#1c1206;font-weight:700;border:none;
+  border-radius:10px;padding:11px 22px;font-size:.9rem;cursor:pointer;transition:filter .15s}
+.baction .primary:hover{filter:brightness(1.08)}
+.baction .primary:disabled{opacity:.55;cursor:wait}
+.baction .ghost{border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:10px;
+  padding:10px 16px;font-size:.82rem;cursor:pointer;transition:all .15s}
+.baction .ghost:hover{color:var(--spec);border-color:var(--spec)}
+.berr{color:#f87171;font-size:.8rem;margin-top:10px;white-space:pre-line;display:none}
 .querybar{display:flex;gap:10px;margin-bottom:10px}
 .querybar input{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:10px;
   padding:13px 16px;color:var(--txt);font-size:.95rem;outline:none;transition:border-color .15s, box-shadow .15s}
@@ -109,13 +141,34 @@ footer a{color:var(--spec);text-decoration:none}
   <div class="packbar" id="packbar" style="display:none"></div>
   <div class="packdesc" id="packdesc"></div>
 
-  <div class="querybar">
+  <div class="querybar" id="querybar">
     <input id="q" placeholder="Ask your agent team anything…" autofocus/>
     <button id="go">Run</button>
   </div>
   <div class="chips" id="chips"></div>
 
-  <div class="net">
+  <div class="builder" id="builder">
+    <div class="bhead">🛠️ Build your own team</div>
+    <div class="bsub">Define your supervisor and specialists, assign them tools from the catalog below, and launch —
+      your team runs live with the full network view. Teams built here are ephemeral (they expire after 2 hours).
+      For custom <i>tools</i> and a permanent setup, scaffold a project with <code>npx agentpack init</code>.</div>
+    <div class="brow">
+      <div><label>Team name</label><input id="bname" placeholder="my-deal-team" maxlength="40"/></div>
+      <div><label>Description</label><input id="bdesc" placeholder="What does this team do?" maxlength="200"/></div>
+    </div>
+    <label>Supervisor instructions (optional)</label>
+    <textarea id="bsup" rows="2" placeholder="Extra guidance for the supervisor, e.g. 'Always end with a go / no-go recommendation.'"></textarea>
+    <div id="bspecs"></div>
+    <div class="baction">
+      <button class="ghost" id="baddspec">＋ Add specialist</button>
+      <span style="flex:1"></span>
+      <button class="ghost" id="byaml">Copy as agentpack.yaml</button>
+      <button class="primary" id="blaunch">🚀 Launch team</button>
+    </div>
+    <div class="berr" id="berr"></div>
+  </div>
+
+  <div class="net" id="net">
     <svg id="edges"></svg>
     <div class="head"><b>Agent Network</b><span id="netsub"></span>
       <span class="meta"><span id="hops"></span><span id="timer"></span></span></div>
@@ -143,26 +196,39 @@ footer a{color:var(--spec);text-decoration:none}
 
 <script>
 const els = {};
-for (const id of ["q","go","suprow","cols","feed","answer","abody","atitle","copy","hops","timer","stats","netsub","packbar","packdesc","chips","title","dot","mcppath","edges"])
+for (const id of ["q","go","suprow","cols","feed","answer","abody","atitle","copy","hops","timer","stats","netsub","packbar","packdesc","chips","title","dot","mcppath","edges","net","querybar","builder","bname","bdesc","bsup","bspecs","baddspec","byaml","blaunch","berr"])
   els[id] = document.getElementById(id);
-let allPacks = [], activePack = null, netData = null;
+let allPacks = [], activePack = null, netData = null, dynamicEnabled = false;
 let nodeEls = {}, edgeEls = {}, hopCount = 0, t0 = 0, timerIv = null, running = false, rawAnswer = "";
+let toolCat = [], specs = [];
 
 const pretty = s => s.replace(/[_-]/g," ").replace(/\\b\\w/g, c => c.toUpperCase());
 
 async function init() {
-  allPacks = (await (await fetch("/api/packs")).json()).packs;
-  if (allPacks.length > 1) {
-    els.packbar.style.display = "flex";
-    for (const p of allPacks) {
-      const b = document.createElement("button");
-      b.className = "packtab"; b.textContent = pretty(p.name); b.dataset.pack = p.name;
-      b.onclick = () => { if (!running) switchPack(p.name); };
-      els.packbar.appendChild(b);
-    }
-  }
+  const data = await (await fetch("/api/packs")).json();
+  allPacks = data.packs; dynamicEnabled = data.dynamicEnabled !== false;
+  renderTabs();
   const saved = sessionStorage.getItem("agentpack-active");
   switchPack(allPacks.some(p => p.name === saved) ? saved : allPacks[0].name);
+}
+
+function renderTabs() {
+  els.packbar.innerHTML = "";
+  els.packbar.style.display = (allPacks.length > 1 || dynamicEnabled) ? "flex" : "none";
+  for (const p of allPacks) {
+    const b = document.createElement("button");
+    b.className = "packtab" + (p.custom ? " custom" : "");
+    b.textContent = pretty(p.name); b.dataset.pack = p.name;
+    if (p.custom) b.title = "Custom team built in the browser (ephemeral)";
+    b.onclick = () => { if (!running) switchPack(p.name); };
+    els.packbar.appendChild(b);
+  }
+  if (dynamicEnabled) {
+    const b = document.createElement("button");
+    b.className = "packtab build"; b.id = "buildtab"; b.textContent = "＋ Build your own";
+    b.onclick = () => { if (!running) showBuilder(); };
+    els.packbar.appendChild(b);
+  }
 }
 
 async function switchPack(name) {
@@ -170,13 +236,129 @@ async function switchPack(name) {
   sessionStorage.setItem("agentpack-active", name);
   for (const b of els.packbar.children) b.classList.toggle("on", b.dataset.pack === name);
   els.title.textContent = pretty(name);
-  els.packdesc.textContent = activePack.description;
+  els.packdesc.textContent = activePack.description + (activePack.custom ? " · custom team (expires in ~2h)" : "");
   els.mcppath.textContent = allPacks.length > 1 ? "/mcp/" + name : "/mcp";
+  els.builder.style.display = "none";
+  els.querybar.style.display = "flex"; els.net.style.display = "block";
   els.answer.style.display = "none"; els.feed.style.display = "none";
   els.hops.textContent = ""; els.timer.textContent = ""; els.dot.className = "dot";
   renderChips();
   await loadNetwork();
 }
+
+// ── build-your-own ──────────────────────────────────────────────────────────
+async function showBuilder() {
+  activePack = null;
+  for (const b of els.packbar.children) b.classList.toggle("on", b.id === "buildtab");
+  els.querybar.style.display = "none"; els.chips.innerHTML = "";
+  els.net.style.display = "none"; els.feed.style.display = "none"; els.answer.style.display = "none";
+  els.builder.style.display = "block";
+  els.title.textContent = "Build Your Own";
+  if (!toolCat.length) toolCat = (await (await fetch("/api/toolcatalog")).json()).tools;
+  els.packdesc.textContent = "Compose a new agent team from " + toolCat.length + " available tools — no code required.";
+  if (!specs.length) { prefillSpecs(); renderSpecs(); }
+}
+
+function prefillSpecs() {
+  const names = toolCat.map(t => t.name);
+  specs = [
+    { name: "researcher", description: "Gathers the raw data the team needs using its tools.",
+      prompt: "You are a research specialist. Use your tools to gather concrete data for each inquiry and report every field the tools return. All search filters are optional — search immediately with whatever criteria were given.",
+      tools: names.slice(0, 2) },
+    { name: "analyst", description: "Analyzes the researcher's findings and produces a recommendation.",
+      prompt: "You are an analyst. Evaluate the data you are given using your tools, show your reasoning with concrete numbers, and end with a clear recommendation.",
+      tools: names.slice(2, 4) },
+  ];
+}
+
+function bfield(label, kind, value, set, ph) {
+  const w = document.createElement("div");
+  const l = document.createElement("label"); l.textContent = label; w.appendChild(l);
+  const el = document.createElement(kind);
+  el.value = value; el.placeholder = ph || "";
+  if (kind === "textarea") el.rows = 3;
+  el.oninput = () => set(el.value);
+  w.appendChild(el);
+  return w;
+}
+
+function renderSpecs() {
+  els.bspecs.innerHTML = "";
+  specs.forEach((s, i) => {
+    const card = document.createElement("div"); card.className = "spcard";
+    if (specs.length > 1) {
+      const x = document.createElement("button"); x.className = "spx"; x.textContent = "✕"; x.title = "Remove specialist";
+      x.onclick = () => { specs.splice(i, 1); renderSpecs(); };
+      card.appendChild(x);
+    }
+    card.appendChild(bfield("Specialist name", "input", s.name, v => s.name = v, "e.g. market_scout"));
+    card.appendChild(bfield("Role description (what the supervisor sees when delegating)", "input", s.description, v => s.description = v, "Finds acquisition targets matching given criteria"));
+    card.appendChild(bfield("System prompt", "textarea", s.prompt, v => s.prompt = v, "You are a …"));
+    const lbl = document.createElement("label"); lbl.textContent = "Tools (" + s.tools.length + " selected)";
+    card.appendChild(lbl);
+    const tp = document.createElement("div"); tp.className = "toolpick";
+    for (const t of toolCat) {
+      const b = document.createElement("button");
+      b.className = "tpick" + (s.tools.includes(t.name) ? " on" : "");
+      b.textContent = pretty(t.name);
+      b.title = t.description + "  ·  from " + pretty(t.source);
+      b.onclick = () => {
+        const j = s.tools.indexOf(t.name);
+        if (j >= 0) s.tools.splice(j, 1); else s.tools.push(t.name);
+        b.classList.toggle("on");
+        lbl.textContent = "Tools (" + s.tools.length + " selected)";
+      };
+      tp.appendChild(b);
+    }
+    card.appendChild(tp);
+    els.bspecs.appendChild(card);
+  });
+}
+
+els.baddspec.onclick = () => {
+  if (specs.length >= 8) return;
+  specs.push({ name: "", description: "", prompt: "", tools: [] });
+  renderSpecs();
+};
+
+els.blaunch.onclick = async () => {
+  els.berr.style.display = "none";
+  els.blaunch.disabled = true; els.blaunch.textContent = "Launching…";
+  const r = await fetch("/api/packs", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: els.bname.value.trim() || "my-team",
+      description: els.bdesc.value.trim(),
+      supervisor: { instructions: els.bsup.value.trim() },
+      specialists: specs,
+    }) });
+  const j = await r.json().catch(() => ({}));
+  els.blaunch.disabled = false; els.blaunch.textContent = "🚀 Launch team";
+  if (!r.ok) {
+    els.berr.textContent = (j.problems || [j.error || "launch failed"]).join("\\n");
+    els.berr.style.display = "block";
+    return;
+  }
+  allPacks = (await (await fetch("/api/packs")).json()).packs;
+  renderTabs();
+  switchPack(j.name);
+};
+
+els.byaml.onclick = async () => {
+  const y = ["name: " + (els.bname.value.trim() || "my-team")];
+  if (els.bdesc.value.trim()) y.push("description: " + JSON.stringify(els.bdesc.value.trim()));
+  y.push("", "specialists:");
+  for (const s of specs) {
+    y.push("  - name: " + (s.name || "specialist"));
+    y.push("    description: " + JSON.stringify(s.description));
+    y.push("    prompt: |");
+    for (const line of (s.prompt || "").split("\\n")) y.push("      " + line);
+    y.push("    tools: [" + s.tools.join(", ") + "]");
+  }
+  y.push("", "# point at your own tool modules — scaffold with: npx agentpack init", "tools: ./tools");
+  await navigator.clipboard.writeText(y.join("\\n"));
+  els.byaml.textContent = "Copied ✓";
+  setTimeout(() => els.byaml.textContent = "Copy as agentpack.yaml", 1500);
+};
 
 function renderChips() {
   els.chips.innerHTML = "";

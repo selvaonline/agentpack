@@ -145,6 +145,7 @@ Edit the YAML, restart. That's the whole iteration loop.
 | `GET /events/:runId` | SSE stream — a clean 9-event vocabulary (`hop`, `tool_executing`, `agent_step`, `answer_chunk`, …) |
 | `GET /api/network` | `{nodes, edges}` team topology |
 | `GET /api/tools` · `POST /api/tools/execute` | Inspect and call any tool directly — **zero tokens**, deterministic, golden-testable |
+| `GET /api/toolcatalog` · `POST /api/packs` | Tool catalog + **build-your-own teams**: compose a new team from loaded tools at runtime, no restart |
 | `ALL /mcp` | **Auto-generated MCP server** (Streamable HTTP) — connect Claude, Cursor, or any MCP client to your team's tools |
 
 Connect from Cursor or Claude Desktop:
@@ -152,6 +153,18 @@ Connect from Cursor or Claude Desktop:
 ```json
 { "mcpServers": { "trip-planner": { "url": "http://localhost:3000/mcp" } } }
 ```
+
+### Build a team in the browser — no code
+
+The dev UI ships with a **＋ Build your own** tab: name your team, define specialists
+(name, role, system prompt), assign them tools picked from the catalog of everything
+the server has loaded, and hit **Launch** — the team goes live instantly with the full
+network view, its own MCP endpoint at `/mcp/<name>`, and conversation memory.
+One click exports your design as a ready-to-run `agentpack.yaml`.
+
+Browser-built teams are ephemeral (they expire after ~2 hours) and compose *existing*
+tools only. For custom tools and a permanent setup, scaffold a project with
+`npx agentpack init` — or disable the feature entirely with `AGENTPACK_DYNAMIC=0`.
 
 ## Evals as a first-class citizen
 
