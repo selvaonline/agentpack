@@ -23,6 +23,32 @@ export interface AgentpackServer {
   pack: AgentPack;
 }
 
+/** Sliding-window rate limit per client IP. LLM runs cost real money, so the
+ * run endpoint is limited by default (AGENTPACK_RUN_LIMIT per hour, 0 = off). */
+function rateLimit(limitPerHour: number) {
+  const windows = new Map<string, { count: number; resetAt: number }>();
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (limitPerHour <= 0) return next();
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
+      || req.socket.remoteAddress || "unknown";
+    const now = Date.now();
+    const w = windows.get(ip);
+    if (!w || now > w.resetAt) {
+      windows.set(ip, { count: 1, resetAt: now + 60 * 60 * 1000 });
+      if (windows.size > 10000) {
+        for (const [k, v] of windows) if (now > v.resetAt) windows.delete(k);
+      }
+      return next();
+    }
+    if (w.count >= limitPerHour) {
+      res.status(429).json({ error: "rate limit exceeded — try again later" });
+      return;
+    }
+    w.count++;
+    next();
+  };
+}
+
 export function createServer(pack: AgentPack): AgentpackServer {
   const registry = buildRegistry(pack);
   const app = express();
@@ -64,7 +90,8 @@ export function createServer(pack: AgentPack): AgentpackServer {
     }
   });
 
-  app.post("/api/run", (req, res) => {
+  const runLimiter = rateLimit(Number(process.env.AGENTPACK_RUN_LIMIT ?? 30));
+  app.post("/api/run", runLimiter, (req, res) => {
     const { query, threadId: clientThreadId } = req.body || {};
     if (!query || typeof query !== "string") {
       res.status(400).json({ error: "query required" });
