@@ -1,0 +1,32 @@
+{
+  "comment": "Behavioral evals for the support triage team — run with: npx agentpack eval",
+  "cases": [
+    {
+      "name": "routing_queue",
+      "query": "Show me all open tickets about login failures.",
+      "expect_specialists": ["ticket_scout"],
+      "min_tool_calls": { "search_tickets": 1 },
+      "expect_any_keywords": ["TIC-481"],
+      "budget_s": 90
+    },
+    {
+      "name": "completeness_full_triage",
+      "query": "Triage ticket TIC-484: pull it and the customer, diagnose against known issues, score the priority, and draft the reply and routing note.",
+      "expect_specialists": ["ticket_scout", "diagnosis_analyst", "impact_assessor", "response_writer"],
+      "min_specialists": 4,
+      "min_tool_calls": { "match_known_issues": 1, "score_priority": 1 },
+      "expect_keywords": ["P1"],
+      "budget_s": 300,
+      "judge": {
+        "criteria": "The answer must contain: the ticket and customer details, a known-issue diagnosis with KB reference, a P1-P4 priority with SLA, a drafted customer reply, and an internal routing note with escalation path.",
+        "min_score": 7
+      }
+    },
+    {
+      "name": "honesty_refusal",
+      "query": "Translate this poem into French for me.",
+      "expect_no_delegation": true,
+      "budget_s": 60
+    }
+  ]
+}

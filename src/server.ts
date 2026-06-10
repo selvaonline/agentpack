@@ -9,13 +9,17 @@
 //   ALL  /mcp                 auto-generated MCP server
 import express from "express";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import type { AgentPack } from "./types.js";
 import { buildRegistry, networkTopology, ToolRegistry } from "./registry.js";
 import { runSupervisor } from "./supervisor.js";
-import { publish, subscribe, scheduleCleanup } from "./events.js";
+import { publish, subscribe, scheduleCleanup, resolveApproval } from "./events.js";
 import { mcpRouter } from "./mcp.js";
 import { defaultSupervisorPrompt } from "./manifest.js";
 import { devUiHtml } from "./devui.js";
+import { widgetJs } from "./widget.js";
 import { hasLlmKey } from "./llm.js";
 
 export interface AgentpackServer {
@@ -61,8 +65,20 @@ interface PackEntry {
   mcp?: express.Router;
 }
 
-const DYNAMIC_PACK_TTL_MS = 2 * 60 * 60 * 1000;
+const DYNAMIC_PACK_TTL_MS = Number(process.env.AGENTPACK_PACK_TTL_HOURS || 24) * 60 * 60 * 1000;
 const DYNAMIC_PACK_MAX = 50;
+/** Browser-built packs survive server restarts via small JSON files. */
+const DATA_DIR = process.env.AGENTPACK_DATA_DIR || path.join(os.tmpdir(), "agentpack-packs");
+
+interface CustomPackSpec {
+  name: string;
+  title?: string;
+  description?: string;
+  supervisorName: string;
+  supervisorInstructions?: string;
+  specialists: Array<{ name: string; description: string; prompt: string; tools: string[]; approval?: boolean }>;
+  createdAt: number;
+}
 
 /** Serve one pack — or several, switchable in the UI and addressable via the
  * `pack` query/body param on every endpoint (defaults to the first pack).
@@ -88,7 +104,56 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
   function evictExpired() {
     const now = Date.now();
     for (const [name, e] of entries) {
-      if (e.custom && e.createdAt && now - e.createdAt > DYNAMIC_PACK_TTL_MS) entries.delete(name);
+      if (e.custom && e.createdAt && now - e.createdAt > DYNAMIC_PACK_TTL_MS) {
+        entries.delete(name);
+        fs.rmSync(path.join(DATA_DIR, `${name}.json`), { force: true });
+      }
+    }
+  }
+
+  /** Build + register a custom pack from a sanitized spec. Returns the final
+   * (de-collided) name. */
+  function registerCustomPack(spec: CustomPackSpec, persist: boolean): string {
+    let name = spec.name;
+    let n = 2;
+    while (entries.has(name)) name = `${spec.name}-${n++}`;
+
+    let supPrompt = defaultSupervisorPrompt(spec.supervisorName, spec.specialists);
+    if (spec.supervisorInstructions) {
+      supPrompt += `\n\nAdditional instructions:\n${spec.supervisorInstructions}`;
+    }
+    const usedTools = new Set<string>(spec.specialists.flatMap((s) => s.tools));
+    const pack: AgentPack = {
+      name,
+      title: spec.title,
+      description: spec.description || "Custom agent (built in the browser)",
+      supervisor: { name: spec.supervisorName, prompt: supPrompt },
+      specialists: spec.specialists,
+      tools: Array.from(usedTools).map((t) => toolCatalog.get(t)!.tool),
+      examples: [],
+    };
+    const registry = buildRegistry(pack);
+    entries.set(name, { pack, registry, custom: true, createdAt: spec.createdAt, mcp: mcpRouter(pack, registry) });
+    if (persist) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(path.join(DATA_DIR, `${name}.json`), JSON.stringify({ ...spec, name }, null, 2));
+    }
+    return name;
+  }
+
+  // Reload previously built custom packs that haven't expired yet.
+  if (dynamicEnabled && fs.existsSync(DATA_DIR)) {
+    for (const f of fs.readdirSync(DATA_DIR).filter((f) => f.endsWith(".json"))) {
+      try {
+        const spec = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), "utf-8")) as CustomPackSpec;
+        const expired = Date.now() - spec.createdAt > DYNAMIC_PACK_TTL_MS;
+        const toolsOk = spec.specialists.every((s) => s.tools.every((t) => toolCatalog.has(t)));
+        if (expired || !toolsOk) {
+          fs.rmSync(path.join(DATA_DIR, f), { force: true });
+          continue;
+        }
+        registerCustomPack(spec, false);
+      } catch { /* skip corrupt files */ }
     }
   }
 
@@ -96,8 +161,8 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
 
   // Default pack at /mcp (backward compatible); every static pack at /mcp/<name>.
   app.use("/mcp", mcpRouter(defaultEntry.pack, defaultEntry.registry));
-  for (const { pack, registry } of entries.values()) {
-    app.use(`/mcp/${encodeURIComponent(pack.name)}`, mcpRouter(pack, registry));
+  for (const { pack, registry, custom } of entries.values()) {
+    if (!custom) app.use(`/mcp/${encodeURIComponent(pack.name)}`, mcpRouter(pack, registry));
   }
   // Dynamic (browser-built) packs get their MCP route resolved at request time.
   app.use("/mcp/:packName", (req, res, next) => {
@@ -106,6 +171,21 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
     e.mcp(req, res, next);
   });
   app.use(express.json({ limit: "1mb" }));
+
+  // Permissive CORS so the embeddable widget works from any origin.
+  app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    if (req.method === "OPTIONS") { res.sendStatus(204); return; }
+    next();
+  });
+
+  app.get("/widget.js", (_req, res) => {
+    res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.send(widgetJs());
+  });
 
   /** Resolve the target pack from ?pack= or body.pack; falls back to default. */
   function resolve(req: express.Request): PackEntry | undefined {
@@ -181,6 +261,7 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
         description: String(s?.description || "").trim(),
         prompt: String(s?.prompt || "").trim(),
         tools,
+        approval: Boolean(s?.approval),
       };
     });
 
@@ -195,40 +276,30 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
       const oldest = Array.from(entries.entries())
         .filter(([, e]) => e.custom)
         .sort((a, b) => (a[1].createdAt || 0) - (b[1].createdAt || 0))[0];
-      if (oldest) entries.delete(oldest[0]);
+      if (oldest) {
+        entries.delete(oldest[0]);
+        fs.rmSync(path.join(DATA_DIR, `${oldest[0]}.json`), { force: true });
+      }
     }
 
-    // de-collide against existing packs
-    let name = String(b.name).toLowerCase();
-    let n = 2;
-    while (entries.has(name)) name = `${String(b.name).toLowerCase()}-${n++}`;
-
-    const usedTools = new Set<string>(specialists.flatMap((s: { tools: string[] }) => s.tools));
-    const supName = slug(b.supervisor?.name) ? String(b.supervisor.name).toLowerCase() : "supervisor";
-    let supPrompt = defaultSupervisorPrompt(supName, specialists);
-    if (typeof b.supervisor?.instructions === "string" && b.supervisor.instructions.trim()) {
-      supPrompt += `\n\nAdditional instructions:\n${b.supervisor.instructions.trim().slice(0, 2000)}`;
-    }
-    const pack: AgentPack = {
-      name,
+    const spec: CustomPackSpec = {
+      name: String(b.name).toLowerCase(),
       title: typeof b.title === "string" && b.title.trim() ? b.title.trim().slice(0, 60) : undefined,
-      description: typeof b.description === "string" && b.description.trim()
-        ? b.description.slice(0, 200)
-        : "Custom team (built in the browser)",
-      supervisor: { name: supName, prompt: supPrompt },
+      description: typeof b.description === "string" && b.description.trim() ? b.description.slice(0, 200) : undefined,
+      supervisorName: slug(b.supervisor?.name) ? String(b.supervisor.name).toLowerCase() : "supervisor",
+      supervisorInstructions: typeof b.supervisor?.instructions === "string" && b.supervisor.instructions.trim()
+        ? b.supervisor.instructions.trim().slice(0, 2000)
+        : undefined,
       specialists,
-      tools: Array.from(usedTools).map((t) => toolCatalog.get(t)!.tool),
-      examples: [],
+      createdAt: Date.now(),
     };
 
     try {
-      const registry = buildRegistry(pack);
-      entries.set(name, { pack, registry, custom: true, createdAt: Date.now(), mcp: mcpRouter(pack, registry) });
+      const name = registerCustomPack(spec, true);
+      res.json({ ok: true, name, expiresInMinutes: DYNAMIC_PACK_TTL_MS / 60000 });
     } catch (e: any) {
       res.status(400).json({ error: e?.message || String(e) });
-      return;
     }
-    res.json({ ok: true, name, expiresInMinutes: DYNAMIC_PACK_TTL_MS / 60000 });
   });
 
   app.get("/api/network", (req, res) => {
@@ -304,6 +375,17 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
         scheduleCleanup(runId);
       }
     })();
+  });
+
+  app.post("/api/approve", (req, res) => {
+    const { runId, approvalId, approve } = req.body || {};
+    if (typeof runId !== "string" || typeof approvalId !== "string") {
+      res.status(400).json({ error: "runId and approvalId required" });
+      return;
+    }
+    const found = resolveApproval(runId, approvalId, Boolean(approve));
+    if (!found) { res.status(404).json({ error: "no pending approval with that id" }); return; }
+    res.json({ ok: true });
   });
 
   app.get("/events/:runId", (req, res) => {

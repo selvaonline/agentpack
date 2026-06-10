@@ -2,6 +2,8 @@
 
 **Define your AI agent team in one YAML file. Get a multi-agent supervisor, a live network UI, an MCP server, and a behavioral eval harness — out of the box. TypeScript.**
 
+[![npm](https://img.shields.io/npm/v/%40selvaonline%2Fagentpack)](https://www.npmjs.com/package/@selvaonline/agentpack)
+[![CI](https://github.com/selvaonline/agentpack/actions/workflows/ci.yml/badge.svg)](https://github.com/selvaonline/agentpack/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](package.json)
 [![Built on LangGraph.js](https://img.shields.io/badge/orchestration-LangGraph.js-blue)](https://langchain-ai.github.io/langgraphjs/)
@@ -27,13 +29,15 @@ Multi-agent frameworks give you orchestration primitives and a blank screen. Eve
 
 **Live demo:** [agentpack.selvaonline.com](https://agentpack.selvaonline.com) — the `deal-ma` template running on AWS: ask it to evaluate an acquisition and watch the six-agent network work. Its MCP server is public too: `https://agentpack.selvaonline.com/mcp`.
 
+**Docs:** [selvaonline.github.io/agentpack](https://selvaonline.github.io/agentpack/)
+
 ## Five minutes to a running team
 
 ```bash
 npx @selvaonline/agentpack init my-team
-cd my-team
+cd my-team && npm install
 cp .env.example .env        # add ONE key: OpenAI, Gemini, or Groq
-npx agentpack dev           # → http://localhost:3000
+npm run dev                 # → http://localhost:3000
 ```
 
 You now have a working travel-planning team — a supervisor delegating to a destination scout, a budget planner, and an itinerary writer over deterministic demo tools. Ask it:
@@ -43,7 +47,7 @@ You now have a working travel-planning team — a supervisor delegating to a des
 Then prove it behaves:
 
 ```bash
-npx agentpack eval          # routing / completeness / refusal — against the live server
+npm run eval                # routing / completeness / refusal — against the live server
 ```
 
 ```text
@@ -52,15 +56,15 @@ PASS completeness_full_plan  agents=["destination_scout","budget_planner","itine
 PASS honesty_refusal         agents=[]  (off-topic request: no delegation, polite decline)
 ```
 
-## Templates: a full deal team in one command
+## Templates: a full vertical team in one command
 
-The starter team is a toy. The deal templates are the product — the same six-role deal lifecycle (**scout → risk → market → financial modeler → portfolio manager → deal writer**) instantiated for three industries:
+The starter team is a toy. The vertical templates are the product — complete teams with prompts, deterministic demo tools, and eval suites:
 
 ```bash
-npx agentpack templates                          # list available templates
-npx agentpack init my-fund   --template deal-vc
-npx agentpack init acquisitions --template deal-ma
-npx agentpack init sourcing  --template deal-procurement
+npx @selvaonline/agentpack templates                            # list available templates
+npx @selvaonline/agentpack init my-fund      --template deal-vc
+npx @selvaonline/agentpack init acquisitions --template deal-ma
+npx @selvaonline/agentpack init coverage     --template equity-research
 ```
 
 | Template | Team | Tools (deterministic demo data — swap for your APIs) |
@@ -68,6 +72,9 @@ npx agentpack init sourcing  --template deal-procurement
 | `deal-ma` | M&A acquisition team | target screening, weighted risk scoring, sector multiples, **real DCF math**, portfolio fit |
 | `deal-vc` | VC investment team | deal-flow sourcing, founder/market risk, **TAM/SAM/SOM + dilution math**, fund-thesis fit |
 | `deal-procurement` | Procurement sourcing team | vendor search, supplier risk, category intel, **TCO modeling**, spend concentration |
+| `equity-research` | Equity research team | universe screening, **earnings-quality scoring**, DCF + peer multiples, initiation notes |
+| `claims-triage` | Insurance claims triage | claim/policy lookup, **fraud scoring**, severity + reserve math, triage decisions |
+| `support-triage` | Customer support triage | ticket queue, known-issue matching, **P1-P4 + SLA scoring**, drafted replies |
 | `starter` | Trip-planning team | the gentlest possible introduction |
 
 ![M&A deal team mid-run](docs/assets/deal-team-live.png)
@@ -108,8 +115,11 @@ specialists:
     description: Estimates trip costs and builds budget breakdowns.
     prompt: ./prompts/budget_planner.md
     tools: [estimate_costs]
+    approval: true                   # human-in-the-loop: pause until the user approves
 
-tools: ./tools        # directory of plain TS/JS modules — auto-discovered
+tools:
+  - ./tools                          # directory of plain TS/JS modules — auto-discovered
+  # - mcp:https://remote-host/mcp    # or pull every tool from a remote MCP server
 ```
 
 Tools are **dependency-free duck-typed objects** — no imports from agentpack, trivially unit-testable, reusable anywhere:
@@ -141,12 +151,14 @@ Edit the YAML, restart. That's the whole iteration loop.
 
 | Endpoint | What it does |
 |---|---|
-| `GET /` | Dev UI — live network graph, hop animation, event feed, markdown answers |
+| `GET /` | Dev UI — live network graph, token streaming, hop animation, event feed, light/dark themes |
 | `POST /api/run` | Run a query (`{ query, threadId? }` → `{ runId }`); follow-ups on the same `threadId` keep conversation memory |
-| `GET /events/:runId` | SSE stream — a clean 9-event vocabulary (`hop`, `tool_executing`, `agent_step`, `answer_chunk`, …) |
+| `GET /events/:runId` | SSE stream — `hop`, `tool_executing`, `agent_step`, `answer_token`, `usage`, `approval_request`, … |
+| `POST /api/approve` | Resolve a human-in-the-loop gate (`{ runId, approvalId, approve }`) |
 | `GET /api/network` | `{nodes, edges}` team topology |
 | `GET /api/tools` · `POST /api/tools/execute` | Inspect and call any tool directly — **zero tokens**, deterministic, golden-testable |
 | `GET /api/toolcatalog` · `POST /api/packs` | Tool catalog + **build-your-own teams**: compose a new team from loaded tools at runtime, no restart |
+| `GET /widget.js` | **Embeddable live network panel** — one script tag drops your team into any web page |
 | `ALL /mcp` | **Auto-generated MCP server** (Streamable HTTP) — connect Claude, Cursor, or any MCP client to your team's tools |
 
 Connect from Cursor or Claude Desktop:
@@ -163,9 +175,28 @@ the server has loaded, and hit **Launch** — the team goes live instantly with 
 network view, its own MCP endpoint at `/mcp/<name>`, and conversation memory.
 One click exports your design as a ready-to-run `agentpack.yaml`.
 
-Browser-built teams are ephemeral (they expire after ~2 hours) and compose *existing*
-tools only. For custom tools and a permanent setup, scaffold a project with
-`npx agentpack init` — or disable the feature entirely with `AGENTPACK_DYNAMIC=0`.
+Browser-built teams persist across restarts, are **shareable by URL** (`/?pack=<name>`),
+and expire after 24 hours (configurable via `AGENTPACK_PACK_TTL_HOURS`). They compose
+*existing* tools only — for custom tools and a permanent setup, scaffold a project with
+`npx @selvaonline/agentpack init` — or disable the feature entirely with `AGENTPACK_DYNAMIC=0`.
+
+### Human-in-the-loop approval gates
+
+Mark any specialist `approval: true` in the manifest (or tick the checkbox in the
+browser builder) and every delegation to it **pauses the run** until you click
+Approve or Decline in the UI — or `POST /api/approve` programmatically. Declines
+are reported honestly in the final answer; unanswered requests auto-decline after
+5 minutes.
+
+### Embed your team in any page
+
+```html
+<script src="https://your-agentpack-host/widget.js" data-pack="ma-deal-team"></script>
+<div id="agentpack-widget"></div>
+```
+
+The widget renders a compact live network panel (Shadow DOM — no CSS clashes) with
+a query box, animated specialist activity, and the token-streamed answer.
 
 ## Evals as a first-class citizen
 
@@ -182,6 +213,17 @@ tools only. For custom tools and a permanent setup, scaffold a project with
 ```
 
 Checks available per case: `expect_specialists` / `min_specialists` (routing), `expect_keywords` / `expect_any_keywords` (completeness), `expect_no_delegation` (refusal/honesty), `min_tool_calls` (tool usage), `budget_s` (latency — warn at 1×, fail at 2×).
+
+Add a `judge` block and run `npx agentpack eval --judge` for **LLM-as-judge scoring** on top of the deterministic checks:
+
+```json
+"judge": {
+  "criteria": "The answer must read like an IC memo: concrete figures, a quantified risk assessment, valuation numbers, and an explicit recommendation.",
+  "min_score": 7
+}
+```
+
+A GitHub Actions workflow ships in `.github/workflows/ci.yml` — typecheck + build on every push, full behavioral evals when an LLM key secret is configured.
 
 ## Embed it programmatically
 
@@ -231,30 +273,39 @@ Pick something else when it isn't: **LangGraph** for explicit graph control in P
 src/
   types.ts            AgentPack / AgentTool / SpecialistSpec + event vocabulary
   manifest.ts         agentpack.yaml loader (prompts from files, tools auto-discovered)
+  mcpTools.ts         remote MCP servers as tool sources (tools: [mcp:https://...])
   registry.ts         instance-based tool registry + topology
-  supervisor.ts       generic LangGraph.js supervisor (delegation, memory, events)
-  server.ts           Express factory: run API, SSE, tools API, dev UI, MCP
+  supervisor.ts       generic LangGraph.js supervisor (delegation, memory, streaming, approvals)
+  server.ts           Express factory: run API, SSE, tools API, dev UI, MCP, widget
   mcp.ts              auto-generated MCP server from the registry
   devui.ts            zero-build live network UI
-  evals.ts            behavioral eval harness
+  widget.ts           embeddable network-panel widget (/widget.js)
+  evals.ts            behavioral eval harness (+ LLM-as-judge)
   cli.ts              agentpack init / templates / dev / eval
 templates/
   starter/            trip-planning team — the gentle introduction
   deal-ma/            M&A acquisition team (6 roles, 7 tools, evals)
   deal-vc/            VC investment team (6 roles, 6 tools, evals)
   deal-procurement/   procurement sourcing team (6 roles, 5 tools, evals)
+  equity-research/    equity research team (4 roles, 5 tools, evals)
+  claims-triage/      insurance claims triage (4 roles, 4 tools, evals)
+  support-triage/     customer support triage (4 roles, 4 tools, evals)
 ```
 
 ## Roadmap
 
 - [x] Multi-pack serving (one server, many teams, switchable in the UI)
-- [x] Build-your-own teams in the browser (ephemeral packs from the tool catalog)
+- [x] Build-your-own teams in the browser (persistent, shareable by URL)
 - [x] Light/dark theme dev UI
-- [ ] More vertical templates (equity research, insurance underwriting, claims triage)
-- [ ] `agentpack eval --judge` — LLM-as-judge scoring (faithfulness, completeness) on top of deterministic checks
-- [ ] Remote MCP servers as tool sources (`tools: mcp://...` in the manifest)
-- [ ] Embeddable network-panel web component for production UIs
-- [ ] Streaming token-level answers
+- [x] More vertical templates (equity research, claims triage, support triage)
+- [x] `agentpack eval --judge` — LLM-as-judge scoring on top of deterministic checks
+- [x] Remote MCP servers as tool sources (`tools: [mcp:https://...]` in the manifest)
+- [x] Embeddable network-panel web component (`/widget.js`)
+- [x] Streaming token-level answers + live token meter
+- [x] Human-in-the-loop approval gates (`approval: true`)
+- [ ] Persistent conversation memory (Redis/Postgres checkpointer)
+- [ ] OpenTelemetry tracing
+- [ ] Multi-supervisor hierarchies (teams of teams)
 
 ## About
 

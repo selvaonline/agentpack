@@ -16,7 +16,11 @@
       "min_specialists": 6,
       "min_tool_calls": { "score_deal_risk": 1, "dcf_valuation": 1 },
       "expect_keywords": ["risk", "recommendation"],
-      "budget_s": 300
+      "budget_s": 300,
+      "judge": {
+        "criteria": "The answer must read like an IC memo: company profile with concrete figures, a quantified risk assessment, sector outlook, valuation numbers from DCF and comparables, portfolio fit, and an explicit go/no-go style recommendation.",
+        "min_score": 7
+      }
     },
     {
       "name": "honesty_refusal",

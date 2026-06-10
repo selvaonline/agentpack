@@ -30,3 +30,34 @@ export function subscribe(runId: string, listener: Listener): () => void {
 export function scheduleCleanup(runId: string, ms = 10 * 60 * 1000): void {
   setTimeout(() => buffers.delete(runId), ms).unref?.();
 }
+
+// ── human-in-the-loop approvals ──────────────────────────────────────────────
+// A specialist marked `approval: true` pauses its run until the user resolves
+// the request (POST /api/approve) or the timeout auto-denies it.
+const pendingApprovals = new Map<string, (approved: boolean) => void>();
+
+export function waitForApproval(
+  runId: string, approvalId: string, timeoutMs = 5 * 60 * 1000
+): Promise<boolean> {
+  const key = `${runId}:${approvalId}`;
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingApprovals.delete(key);
+      resolve(false);
+    }, timeoutMs);
+    timer.unref?.();
+    pendingApprovals.set(key, (approved) => {
+      clearTimeout(timer);
+      pendingApprovals.delete(key);
+      resolve(approved);
+    });
+  });
+}
+
+/** Returns false if there is no matching pending approval. */
+export function resolveApproval(runId: string, approvalId: string, approved: boolean): boolean {
+  const fn = pendingApprovals.get(`${runId}:${approvalId}`);
+  if (!fn) return false;
+  fn(approved);
+  return true;
+}

@@ -1,0 +1,32 @@
+{
+  "comment": "Behavioral evals for the claims triage team — run with: npx agentpack eval",
+  "cases": [
+    {
+      "name": "routing_lookup",
+      "query": "Look up all open auto claims.",
+      "expect_specialists": ["intake_clerk"],
+      "min_tool_calls": { "lookup_claim": 1 },
+      "expect_any_keywords": ["CLM-2031", "CLM-2033", "CLM-2035"],
+      "budget_s": 90
+    },
+    {
+      "name": "completeness_full_triage",
+      "query": "Triage claim CLM-2031: look it up, verify the policy, score fraud risk, estimate severity and reserve, and give me the triage decision.",
+      "expect_specialists": ["intake_clerk", "fraud_analyst", "severity_assessor", "resolution_writer"],
+      "min_specialists": 4,
+      "min_tool_calls": { "fraud_score": 1, "estimate_severity": 1 },
+      "expect_any_keywords": ["fast-track", "standard", "investigate"],
+      "budget_s": 300,
+      "judge": {
+        "criteria": "The answer must read like a triage report: claim details, policy verification with limit and deductible, a fraud score with band, a reserve recommendation in dollars, and an explicit FAST-TRACK/STANDARD/INVESTIGATE decision with reasoning.",
+        "min_score": 7
+      }
+    },
+    {
+      "name": "honesty_refusal",
+      "query": "What stocks should I buy this week?",
+      "expect_no_delegation": true,
+      "budget_s": 60
+    }
+  ]
+}

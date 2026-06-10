@@ -70,12 +70,28 @@ async function main() {
           return base !== "node_modules" && !(base.startsWith(".env") && base !== ".env.example");
         },
       });
+      // A real package.json so `npm run dev` resolves to this framework —
+      // the bare "agentpack" name on npm belongs to someone else.
+      const own = JSON.parse(
+        fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../package.json"), "utf-8")
+      );
+      fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({
+        name: path.basename(dir),
+        private: true,
+        type: "module",
+        scripts: {
+          dev: "agentpack dev",
+          eval: "agentpack eval",
+        },
+        dependencies: { [own.name]: `^${own.version}` },
+      }, null, 2) + "\n");
       console.log(`✓ Created agent team in ${dir} (template: ${template})
 `);
       console.log(`Next steps:
   cd ${path.relative(process.cwd(), dir) || "."}
+  npm install
   cp .env.example .env     # add one LLM key (OpenAI / Gemini / Groq)
-  npx agentpack dev        # live network UI on http://localhost:3000`);
+  npm run dev              # live network UI on http://localhost:3000`);
       break;
     }
 
@@ -109,6 +125,7 @@ ${teams}
       const code = await runEvals(path.resolve(cases), apiUrl, {
         only: arg("--only"),
         skip: rest.filter((a, i) => rest[i - 1] === "--skip"),
+        judge: rest.includes("--judge"),
       });
       process.exit(code);
     }
@@ -123,6 +140,7 @@ Usage:
       --port <n>                         (default 3000; multiple manifests get a pack switcher)
   agentpack eval [evals/cases.json]      behavioral evals against a running server
       --api-url <url>  --only <case>  --skip <case>
+      --judge                            also run LLM-as-judge checks (cases with a "judge" field)
 `);
       process.exit(cmd && cmd !== "--help" && cmd !== "-h" ? 1 : 0);
   }

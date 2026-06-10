@@ -6,12 +6,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { AgentPack, AgentTool, SpecialistSpec } from "./types.js";
+import { isMcpSource, loadMcpTools } from "./mcpTools.js";
 
 interface ManifestSpecialist {
   name: string;
   description: string;
   prompt: string;
   tools?: string[];
+  approval?: boolean;
 }
 
 interface Manifest {
@@ -42,12 +44,19 @@ function isAgentTool(x: any): x is AgentTool {
   return x && typeof x === "object" && x.schema?.name && typeof x.execute === "function";
 }
 
-/** Import tool modules (TS or JS) and collect every exported AgentTool. */
+/** Import tool modules (TS or JS) and collect every exported AgentTool.
+ * Entries prefixed with "mcp:" are remote MCP servers — every tool they
+ * expose is proxied into the pack. */
 async function loadTools(spec: string | string[] | undefined, baseDir: string): Promise<AgentTool[]> {
   if (!spec) return [];
   const files: string[] = [];
+  const mcpSources: string[] = [];
   const entries = Array.isArray(spec) ? spec : [spec];
   for (const entry of entries) {
+    if (isMcpSource(entry)) {
+      mcpSources.push(entry);
+      continue;
+    }
     const p = path.resolve(baseDir, entry);
     if (!fs.existsSync(p)) throw new Error(`[agentpack] tools path not found: ${p}`);
     if (fs.statSync(p).isDirectory()) {
@@ -70,6 +79,11 @@ async function loadTools(spec: string | string[] | undefined, baseDir: string): 
       if (isAgentTool(exported)) tools.push(exported);
       else if (Array.isArray(exported)) tools.push(...exported.filter(isAgentTool));
     }
+  }
+  for (const source of mcpSources) {
+    const remote = await loadMcpTools(source);
+    console.log(`[agentpack] loaded ${remote.length} tools from MCP server ${source.replace(/^mcp:/i, "")}`);
+    tools.push(...remote);
   }
   return tools;
 }
@@ -127,6 +141,7 @@ export async function loadManifest(manifestPath: string): Promise<AgentPack> {
       description: s.description,
       prompt: resolvePrompt(s.prompt, baseDir),
       tools: s.tools || [],
+      approval: Boolean(s.approval),
     };
   });
 

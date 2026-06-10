@@ -1,0 +1,38 @@
+# agentpack.yaml — customer support triage team
+# Four-role triage lifecycle: ticket intake → diagnosis → priority → response.
+name: support-triage-team
+title: Support Triage Agent
+description: Customer support triage — ticket and customer lookup, known-issue diagnosis, priority scoring with SLA, and drafted responses.
+
+supervisor:
+  name: support_lead
+  prompt: ./prompts/supervisor.md
+
+specialists:
+  - name: ticket_scout
+    description: Finds tickets in the queue and pulls the customer's plan, spend, and history.
+    prompt: ./prompts/ticket_scout.md
+    tools: [search_tickets, get_customer]
+
+  - name: diagnosis_analyst
+    description: Matches symptoms against the known-issue database and suggests fixes.
+    prompt: ./prompts/diagnosis_analyst.md
+    tools: [match_known_issues]
+
+  - name: impact_assessor
+    description: Scores priority (P1-P4) and SLA from severity and customer value.
+    prompt: ./prompts/impact_assessor.md
+    tools: [score_priority]
+
+  - name: response_writer
+    description: Drafts the customer reply and the internal routing note.
+    prompt: ./prompts/response_writer.md
+    tools: []
+
+tools: ./tools
+
+examples:
+  - "Triage ticket TIC-484: pull it and the customer, diagnose against known issues, score the priority, and draft the reply and routing note."
+  - "Show me all open tickets about login failures."
+  - "What priority is a full outage for a customer paying $96k a year?"
+  - "Diagnose: webhooks are delayed about 15 minutes since this morning."

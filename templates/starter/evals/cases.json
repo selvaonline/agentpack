@@ -15,7 +15,11 @@
       "expect_specialists": ["destination_scout", "budget_planner", "itinerary_writer"],
       "min_specialists": 3,
       "expect_keywords": ["day"],
-      "budget_s": 240
+      "budget_s": 240,
+      "judge": {
+        "criteria": "The answer must contain (1) destination research with concrete facts, (2) a cost estimate with numbers that respect the $3000 budget, and (3) a day-by-day itinerary covering all 5 days.",
+        "min_score": 7
+      }
     },
     {
       "name": "honesty_refusal",

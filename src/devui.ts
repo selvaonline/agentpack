@@ -118,6 +118,15 @@ header .right{margin-left:auto;display:flex;align-items:center;gap:10px;font-siz
   font-size:.62rem;font-weight:800;padding:1px 5px;display:none}
 .legend{display:flex;gap:18px;margin-top:18px;font-size:.72rem;color:var(--dim);flex-wrap:wrap;position:relative;z-index:1}
 .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;border:1.5px solid}
+.approve{display:none;background:var(--panel);border:1.5px solid var(--sup);border-radius:14px;
+  padding:14px 20px;margin-bottom:20px;font-size:.86rem;align-items:center;gap:12px;flex-wrap:wrap;
+  box-shadow:0 0 18px -6px rgba(217,119,6,.45)}
+.approve b{color:var(--sup)}
+.approve .q{color:var(--dim);flex:1;min-width:200px;font-style:italic}
+.approve button{border:none;border-radius:8px;padding:8px 18px;font-size:.84rem;font-weight:700;cursor:pointer;transition:filter .15s}
+.approve button:hover{filter:brightness(1.08)}
+.approve .ok{background:linear-gradient(180deg,#34d399,#059669);color:#03281c}
+.approve .no{background:transparent;border:1px solid var(--line);color:var(--dim)}
 .feed{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 20px;margin-bottom:20px;
   max-height:190px;overflow-y:auto;font-size:.82rem;display:none}
 .feed div{padding:3px 0;color:var(--dim);animation:fadein .3s ease}
@@ -161,8 +170,9 @@ footer a{color:var(--spec);text-decoration:none}
   <div class="builder" id="builder">
     <div class="bhead">🛠️ Build your own agent</div>
     <div class="bsub">Define your supervisor and specialists, assign them tools from the catalog below, and launch —
-      your agent runs live with the full network view. Agents built here are ephemeral (they expire after 2 hours).
-      For custom <i>tools</i> and a permanent setup, scaffold a project with <code>npx agentpack init</code>.</div>
+      your agent runs live with the full network view, and the page URL becomes a shareable link.
+      Agents built here expire after 24 hours. For custom <i>tools</i> and a permanent setup,
+      scaffold a project with <code>npx @selvaonline/agentpack init</code>.</div>
     <div class="brow">
       <div><label>Agent name</label><input id="bname" placeholder="my-deal-agent" maxlength="40"/></div>
       <div><label>Description</label><input id="bdesc" placeholder="What does this agent do?" maxlength="200"/></div>
@@ -182,7 +192,7 @@ footer a{color:var(--spec);text-decoration:none}
   <div class="net" id="net">
     <svg id="edges"></svg>
     <div class="head"><b>Agent Network</b><span id="netsub"></span>
-      <span class="meta"><span id="hops"></span><span id="timer"></span></span></div>
+      <span class="meta"><span id="toks"></span><span id="hops"></span><span id="timer"></span></span></div>
     <div class="suprow" id="suprow"></div>
     <div class="cols" id="cols"></div>
     <div class="legend">
@@ -193,6 +203,9 @@ footer a{color:var(--spec);text-decoration:none}
       <span><i style="border-color:var(--visited)"></i>visited</span>
     </div>
   </div>
+
+  <div class="approve" id="approve">⏸️ Approval needed: run <b id="apname"></b>?<span class="q" id="apquery"></span>
+    <button class="ok" id="apok">Approve</button><button class="no" id="apno">Decline</button></div>
 
   <div class="feed" id="feed"></div>
   <div class="answer" id="answer">
@@ -207,11 +220,19 @@ footer a{color:var(--spec);text-decoration:none}
 
 <script>
 const els = {};
-for (const id of ["q","go","suprow","cols","feed","answer","abody","atitle","copy","hops","timer","stats","netsub","packbar","packdesc","chips","title","dot","mcppath","edges","net","querybar","builder","bname","bdesc","bsup","bspecs","baddspec","byaml","blaunch","berr","theme"])
+for (const id of ["q","go","suprow","cols","feed","answer","abody","atitle","copy","hops","timer","toks","stats","netsub","packbar","packdesc","chips","title","dot","mcppath","edges","net","querybar","builder","bname","bdesc","bsup","bspecs","baddspec","byaml","blaunch","berr","theme","approve","apname","apquery","apok","apno"])
   els[id] = document.getElementById(id);
 let allPacks = [], activePack = null, netData = null, dynamicEnabled = false;
 let nodeEls = {}, edgeEls = {}, hopCount = 0, t0 = 0, timerIv = null, running = false, rawAnswer = "";
-let toolCat = [], specs = [];
+let toolCat = [], specs = [], currentRunId = null, currentApproval = null;
+
+async function respondApproval(approve) {
+  els.approve.style.display = "none";
+  if (!currentRunId || !currentApproval) return;
+  await fetch("/api/approve", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ runId: currentRunId, approvalId: currentApproval, approve }) });
+  currentApproval = null;
+}
 
 const pretty = s => s.replace(/[_-]/g," ").replace(/\\b\\w/g, c => c.toUpperCase());
 const label = p => p.title || pretty(p.name);
@@ -220,7 +241,8 @@ async function init() {
   const data = await (await fetch("/api/packs")).json();
   allPacks = data.packs; dynamicEnabled = data.dynamicEnabled !== false;
   renderTabs();
-  const saved = sessionStorage.getItem("agentpack-active");
+  const fromUrl = new URLSearchParams(location.search).get("pack");
+  const saved = fromUrl || sessionStorage.getItem("agentpack-active");
   switchPack(allPacks.some(p => p.name === saved) ? saved : allPacks[0].name);
 }
 
@@ -246,9 +268,10 @@ function renderTabs() {
 async function switchPack(name) {
   activePack = allPacks.find(p => p.name === name);
   sessionStorage.setItem("agentpack-active", name);
+  history.replaceState({}, "", "?pack=" + encodeURIComponent(name));
   for (const b of els.packbar.children) b.classList.toggle("on", b.dataset.pack === name);
   els.title.textContent = label(activePack);
-  els.packdesc.textContent = activePack.description + (activePack.custom ? " · custom agent (expires in ~2h)" : "");
+  els.packdesc.textContent = activePack.description + (activePack.custom ? " · custom agent (expires in ~24h) — share this page URL" : "");
   els.mcppath.textContent = allPacks.length > 1 ? "/mcp/" + name : "/mcp";
   els.builder.style.display = "none";
   els.querybar.style.display = "flex"; els.net.style.display = "block";
@@ -323,6 +346,14 @@ function renderSpecs() {
       tp.appendChild(b);
     }
     card.appendChild(tp);
+    const ap = document.createElement("label");
+    ap.style.cssText = "display:flex;align-items:center;gap:7px;text-transform:none;letter-spacing:0;margin-top:12px;cursor:pointer;font-size:.78rem";
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.checked = !!s.approval; cb.style.width = "auto";
+    cb.onchange = () => s.approval = cb.checked;
+    ap.appendChild(cb);
+    ap.appendChild(document.createTextNode("Require my approval before this specialist runs"));
+    card.appendChild(ap);
     els.bspecs.appendChild(card);
   });
 }
@@ -365,8 +396,9 @@ els.byaml.onclick = async () => {
     y.push("    prompt: |");
     for (const line of (s.prompt || "").split("\\n")) y.push("      " + line);
     y.push("    tools: [" + s.tools.join(", ") + "]");
+    if (s.approval) y.push("    approval: true");
   }
-  y.push("", "# point at your own tool modules — scaffold with: npx agentpack init", "tools: ./tools");
+  y.push("", "# point at your own tool modules — scaffold with: npx @selvaonline/agentpack init", "tools: ./tools");
   await navigator.clipboard.writeText(y.join("\\n"));
   els.byaml.textContent = "Copied ✓";
   setTimeout(() => els.byaml.textContent = "Copy as agentpack.yaml", 1500);
@@ -464,11 +496,12 @@ async function run() {
   els.go.disabled = true; els.go.textContent = "Running…";
   els.dot.className = "dot run";
   els.answer.style.display = "none"; els.abody.innerHTML = "";
+  els.approve.style.display = "none";
   els.feed.style.display = "block"; els.feed.innerHTML = "";
   for (const el of Object.values(nodeEls)) { el.classList.remove("active","visited");
     const b = el.querySelector(".badge"); b.textContent=""; b.style.display="none"; }
   for (const p of Object.values(edgeEls)) p.classList.remove("active","visited");
-  hopCount = 0; els.hops.textContent = ""; t0 = Date.now();
+  hopCount = 0; els.hops.textContent = ""; els.toks.textContent = ""; t0 = Date.now();
   timerIv = setInterval(() => els.timer.textContent = Math.round((Date.now()-t0)/1000)+"s", 500);
 
   const threadKey = "agentpack-thread-" + activePack.name;
@@ -482,6 +515,7 @@ async function run() {
   }
   const { runId, threadId: tid } = await r.json();
   if (tid) sessionStorage.setItem(threadKey, tid);
+  currentRunId = runId;
 
   const es = new EventSource("/events/" + runId);
   es.onmessage = (m) => {
@@ -489,7 +523,18 @@ async function run() {
     if (ev.kind === "hop") { hopCount++; els.hops.textContent = hopCount + " hops"; setActive(ev.target, ev.chain); }
     if (ev.kind === "thinking") feedLine(ev.text);
     if (ev.kind === "tool_executing") feedLine("🔧 " + pretty(ev.toolName) + " executing…");
-    if (ev.kind === "answer_chunk") rawAnswer += ev.text;
+    if (ev.kind === "usage") els.toks.textContent = fmtToks(ev.inputTokens + ev.outputTokens) + " tok";
+    if (ev.kind === "approval_request") {
+      currentApproval = ev.approvalId;
+      els.apname.textContent = pretty(ev.specialist);
+      els.apquery.textContent = '"' + ev.inquiry + '"';
+      els.approve.style.display = "flex";
+      els.approve.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+    if (ev.kind === "approval_resolved") els.approve.style.display = "none";
+    if (ev.kind === "answer_token") { rawAnswer += ev.text; liveAnswer(); }
+    if (ev.kind === "answer_reset") { rawAnswer = ""; els.abody.innerHTML = ""; els.answer.style.display = "none"; }
+    if (ev.kind === "answer_chunk") rawAnswer = ev.text;
     if (ev.kind === "run_finished") {
       es.close();
       finishRun(ev.ok);
@@ -519,11 +564,30 @@ function feedLine(text) {
   els.feed.appendChild(d); els.feed.scrollTop = els.feed.scrollHeight;
 }
 
+const fmtToks = n => n >= 1000 ? (n/1000).toFixed(1).replace(/\\.0$/,"") + "k" : String(n);
+
+// Live markdown rendering of streamed answer tokens (throttled).
+let lastRender = 0;
+function liveAnswer() {
+  if (els.answer.style.display !== "block") {
+    els.atitle.textContent = "Final Report — " + label(activePack);
+    els.answer.style.display = "block";
+    els.answer.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+  const now = Date.now();
+  if (now - lastRender > 120) {
+    lastRender = now;
+    els.abody.innerHTML = marked.parse(rawAnswer);
+  }
+}
+
 els.copy.onclick = async () => {
   await navigator.clipboard.writeText(rawAnswer);
   els.copy.textContent = "Copied ✓";
   setTimeout(() => els.copy.textContent = "Copy markdown", 1500);
 };
+els.apok.onclick = () => respondApproval(true);
+els.apno.onclick = () => respondApproval(false);
 els.go.onclick = run;
 els.q.addEventListener("keydown", e => { if (e.key === "Enter") run(); });
 

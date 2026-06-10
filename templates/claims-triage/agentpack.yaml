@@ -1,0 +1,38 @@
+# agentpack.yaml — insurance claims triage team
+# Four-role triage lifecycle: intake → fraud → severity → decision.
+name: claims-triage-team
+title: Claims Triage Agent
+description: Insurance claims triage — claim intake and policy verification, fraud scoring, severity and reserve estimation, and triage decisions.
+
+supervisor:
+  name: claims_lead
+  prompt: ./prompts/supervisor.md
+
+specialists:
+  - name: intake_clerk
+    description: Looks up claims and verifies policy coverage, limits, and exclusions.
+    prompt: ./prompts/intake_clerk.md
+    tools: [lookup_claim, verify_policy]
+
+  - name: fraud_analyst
+    description: Scores fraud risk from claim history, timing, and documentation signals.
+    prompt: ./prompts/fraud_analyst.md
+    tools: [fraud_score]
+
+  - name: severity_assessor
+    description: Estimates claim severity and recommends a reserve amount.
+    prompt: ./prompts/severity_assessor.md
+    tools: [estimate_severity]
+
+  - name: resolution_writer
+    description: Writes the triage decision — fast-track, standard, or investigate — with reasoning.
+    prompt: ./prompts/resolution_writer.md
+    tools: []
+
+tools: ./tools
+
+examples:
+  - "Triage claim CLM-2031: look it up, verify the policy, score fraud risk, estimate severity and reserve, and give me the triage decision."
+  - "Look up all open auto claims."
+  - "Score fraud risk for a claim filed 2 days after policy inception with 3 prior claims and missing photos."
+  - "What reserve should we book for a water-damage claim with $18,000 estimated repair and no injuries?"

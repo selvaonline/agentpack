@@ -1,0 +1,38 @@
+# agentpack.yaml — sell-side style equity research team
+# Four-role coverage lifecycle: screen → fundamentals → valuation → note.
+name: equity-research-team
+title: Equity Research Agent
+description: Equity research team — coverage screening, fundamental quality checks, DCF and peer-multiple valuation, and initiation notes.
+
+supervisor:
+  name: research_director
+  prompt: ./prompts/supervisor.md
+
+specialists:
+  - name: coverage_scout
+    description: Screens the coverage universe by ticker, sector, or fundamentals and pulls company financials.
+    prompt: ./prompts/coverage_scout.md
+    tools: [screen_companies, get_fundamentals]
+
+  - name: fundamentals_analyst
+    description: Judges earnings quality and balance-sheet health from reported figures.
+    prompt: ./prompts/fundamentals_analyst.md
+    tools: [earnings_quality]
+
+  - name: valuation_analyst
+    description: Produces DCF fair values and peer-multiple cross-checks.
+    prompt: ./prompts/valuation_analyst.md
+    tools: [dcf_fair_value, peer_multiples]
+
+  - name: report_writer
+    description: Writes the initiation note with rating and price target from the team's findings.
+    prompt: ./prompts/report_writer.md
+    tools: []
+
+tools: ./tools
+
+examples:
+  - "Initiate coverage on Meridian Semis: pull its fundamentals, check earnings quality, value it with a DCF and peer multiples, and write the initiation note with a rating."
+  - "Screen the universe for software companies growing revenue over 15%."
+  - "What's the DCF fair value for a company with $840M revenue, 22% FCF margin, 12% growth and 9% discount rate?"
+  - "Compare Meridian Semis and Aurora Grid on earnings quality."

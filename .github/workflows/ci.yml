@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # Add ONE of these as a repository secret to enable behavioral evals in CI.
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Behavioral evals (starter template)
+        if: env.OPENAI_API_KEY != '' || env.GEMINI_API_KEY != '' || env.GROQ_API_KEY != ''
+        run: |
+          npx tsx src/cli.ts dev templates/starter/agentpack.yaml --port 3000 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/api/health > /dev/null && break
+            sleep 1
+          done
+          npx tsx src/cli.ts eval templates/starter/evals/cases.json --api-url http://localhost:3000
+
+      - name: Evals skipped (no LLM key configured)
+        if: env.OPENAI_API_KEY == '' && env.GEMINI_API_KEY == '' && env.GROQ_API_KEY == ''
+        run: echo "No LLM secret configured — typecheck/build only."

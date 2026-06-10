@@ -45,6 +45,8 @@ export interface SpecialistSpec {
   prompt: string;
   /** Tool names this specialist may call (must exist in the pack's tools). */
   tools: string[];
+  /** Human-in-the-loop: pause and ask the user before this specialist runs. */
+  approval?: boolean;
 }
 
 /** A complete agent team, ready to serve. */
@@ -80,11 +82,18 @@ export type Emit = (kind: string, payload?: Record<string, unknown>) => void;
  *   tool_executing  { toolName, agent }
  *   tool_complete   { toolName, agent, durationMs, error? }
  *   agent_step      { hop, type: "delegate"|"tool_call"|"tool_result"|"finding", toolName?, content? }
- *   answer_chunk    { text }   (markdown)
+ *   approval_request  { approvalId, specialist, inquiry }  (run paused, awaiting user)
+ *   approval_resolved { approvalId, approved }
+ *   answer_token    { text }   (live token from the supervisor's final answer)
+ *   answer_reset    {}         (the streamed segment was intermediate — discard it)
+ *   answer_chunk    { text }   (the complete markdown answer)
  *   answer_complete {}
+ *   usage           { inputTokens, outputTokens }  (cumulative across the run)
  *   run_finished    { ok }
  */
 export const EVENT_KINDS = [
   "run_started", "hop", "thinking", "tool_executing", "tool_complete",
-  "agent_step", "answer_chunk", "answer_complete", "run_finished",
+  "agent_step", "approval_request", "approval_resolved",
+  "answer_token", "answer_reset", "answer_chunk", "answer_complete",
+  "usage", "run_finished",
 ] as const;

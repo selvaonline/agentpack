@@ -20,6 +20,8 @@ export interface EvalCase {
   min_tool_calls?: Record<string, number>;
   /** Latency budget in seconds — warn at 1x, fail at 2x. */
   budget_s?: number;
+  /** LLM-as-judge: score the answer against criteria (runs with --judge). */
+  judge?: { criteria: string; min_score?: number };
 }
 
 interface RunResult {
@@ -102,10 +104,26 @@ function checkCase(c: EvalCase, r: RunResult): string[] {
   return problems;
 }
 
+/** Score an answer 1-10 against free-form criteria using the configured LLM. */
+async function judgeAnswer(
+  criteria: string, query: string, answer: string
+): Promise<{ score: number; reason: string }> {
+  const { makeModel } = await import("./llm.js");
+  const model = makeModel();
+  const res = await model.invoke([
+    ["system", 'You are a strict evaluator of AI agent answers. Score how well the answer satisfies the given criteria on a 1-10 scale (10 = fully satisfies, 5 = partially, 1 = not at all). Judge only against the criteria — not style. Respond with ONLY JSON: {"score": <1-10>, "reason": "<one short sentence>"}'],
+    ["human", `Criteria: ${criteria}\n\nUser query: ${query}\n\nAgent answer:\n${answer}`],
+  ]);
+  const text = typeof res.content === "string" ? res.content : JSON.stringify(res.content);
+  const m = text.match(/\{[\s\S]*\}/);
+  const parsed = JSON.parse(m ? m[0] : text);
+  return { score: Number(parsed.score) || 0, reason: String(parsed.reason || "") };
+}
+
 export async function runEvals(
   casesPath: string,
   apiUrl: string,
-  opts: { only?: string; skip?: string[] } = {}
+  opts: { only?: string; skip?: string[]; judge?: boolean } = {}
 ): Promise<number> {
   const { cases } = JSON.parse(fs.readFileSync(casesPath, "utf-8")) as { cases: EvalCase[] };
   let passed = 0, failed = 0, skipped = 0;
@@ -124,6 +142,16 @@ export async function runEvals(
     const problems = checkCase(c, r);
     if (r.durationS > budget * 2) problems.push(`latency ${r.durationS}s exceeds 2x budget (${budget}s)`);
     else if (r.durationS > budget) console.log(`  WARN latency ${r.durationS}s over budget ${budget}s`);
+    if (c.judge && opts.judge) {
+      try {
+        const { score, reason } = await judgeAnswer(c.judge.criteria, c.query, r.answer);
+        const min = c.judge.min_score ?? 7;
+        console.log(`  judge score=${score}/10 (min ${min}) — ${reason}`);
+        if (score < min) problems.push(`judge score ${score} below ${min}: ${reason}`);
+      } catch (e: any) {
+        problems.push(`judge error: ${e?.message || e}`);
+      }
+    }
     console.log(`  agents=${JSON.stringify(r.specialists)} tools=${JSON.stringify(r.toolCalls)} ${r.durationS}s`);
     if (problems.length) { console.log(`FAIL ${c.name} — ${problems.join("; ")}`); failed++; }
     else { console.log(`PASS ${c.name}`); passed++; }

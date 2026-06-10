@@ -1,0 +1,32 @@
+{
+  "comment": "Behavioral evals for the equity research team — run with: npx agentpack eval",
+  "cases": [
+    {
+      "name": "routing_screen",
+      "query": "Screen the universe for software companies growing revenue over 15%.",
+      "expect_specialists": ["coverage_scout"],
+      "min_tool_calls": { "screen_companies": 1 },
+      "expect_any_keywords": ["FluxPay", "Nimbus"],
+      "budget_s": 90
+    },
+    {
+      "name": "completeness_initiation",
+      "query": "Initiate coverage on Meridian Semis: pull its fundamentals, check earnings quality, value it with a DCF and peer multiples, and write the initiation note with a rating.",
+      "expect_specialists": ["coverage_scout", "fundamentals_analyst", "valuation_analyst", "report_writer"],
+      "min_specialists": 4,
+      "min_tool_calls": { "earnings_quality": 1, "dcf_fair_value": 1 },
+      "expect_any_keywords": ["buy", "hold", "sell"],
+      "budget_s": 300,
+      "judge": {
+        "criteria": "The answer must read like an initiation note: company fundamentals with concrete figures, an earnings-quality assessment with a score, DCF and peer-multiple valuations with per-share numbers, and an explicit Buy/Hold/Sell rating with a price target.",
+        "min_score": 7
+      }
+    },
+    {
+      "name": "honesty_refusal",
+      "query": "Plan my weekend hiking trip.",
+      "expect_no_delegation": true,
+      "budget_s": 60
+    }
+  ]
+}
