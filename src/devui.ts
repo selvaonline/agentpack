@@ -62,7 +62,9 @@ header .right{margin-left:auto;display:flex;align-items:center;gap:10px;font-siz
 .spcard .spx{position:absolute;top:10px;right:12px;border:none;background:transparent;color:var(--dim);
   cursor:pointer;font-size:.9rem}
 .spcard .spx:hover{color:var(--err)}
-.toolpick{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.toolpick{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center}
+.tgroup{flex-basis:100%;font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);
+  margin-top:6px;opacity:.75}
 .tpick{border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:12px;
   padding:3px 11px;font-size:.72rem;cursor:pointer;transition:all .12s}
 .tpick:hover{color:var(--txt)}
@@ -295,15 +297,22 @@ async function showBuilder() {
 }
 
 function prefillSpecs() {
-  const names = toolCat.map(t => t.name);
+  // No pre-selected tools: a silently wrong default (e.g. deal tools on a
+  // travel agent) is worse than an explicit empty state.
   specs = [
     { name: "researcher", description: "Gathers the raw data the team needs using its tools.",
       prompt: "You are a research specialist. Use your tools to gather concrete data for each inquiry and report every field the tools return. All search filters are optional — search immediately with whatever criteria were given.",
-      tools: names.slice(0, 2) },
+      tools: [] },
     { name: "analyst", description: "Analyzes the researcher's findings and produces a recommendation.",
       prompt: "You are an analyst. Evaluate the data you are given using your tools, show your reasoning with concrete numbers, and end with a clear recommendation.",
-      tools: names.slice(2, 4) },
+      tools: [] },
   ];
+}
+
+function toolsLabel(s) {
+  return s.tools.length
+    ? "Tools (" + s.tools.length + " selected)"
+    : "Tools — pick what this specialist needs (or leave empty for a pure writer/analyst role)";
 }
 
 function bfield(label, kind, value, set, ph) {
@@ -329,10 +338,20 @@ function renderSpecs() {
     card.appendChild(bfield("Specialist name", "input", s.name, v => s.name = v, "e.g. market_scout"));
     card.appendChild(bfield("Role description (what the supervisor sees when delegating)", "input", s.description, v => s.description = v, "Finds acquisition targets matching given criteria"));
     card.appendChild(bfield("System prompt", "textarea", s.prompt, v => s.prompt = v, "You are a …"));
-    const lbl = document.createElement("label"); lbl.textContent = "Tools (" + s.tools.length + " selected)";
+    const lbl = document.createElement("label"); lbl.textContent = toolsLabel(s);
+    if (!s.tools.length) lbl.style.color = "var(--sup)";
     card.appendChild(lbl);
     const tp = document.createElement("div"); tp.className = "toolpick";
+    // Group the catalog by source agent so related tools sit together.
+    let lastSource = null;
     for (const t of toolCat) {
+      if (t.source !== lastSource) {
+        lastSource = t.source;
+        const g = document.createElement("span");
+        g.className = "tgroup";
+        g.textContent = pretty(t.source);
+        tp.appendChild(g);
+      }
       const b = document.createElement("button");
       b.className = "tpick" + (s.tools.includes(t.name) ? " on" : "");
       b.textContent = pretty(t.name);
@@ -341,7 +360,8 @@ function renderSpecs() {
         const j = s.tools.indexOf(t.name);
         if (j >= 0) s.tools.splice(j, 1); else s.tools.push(t.name);
         b.classList.toggle("on");
-        lbl.textContent = "Tools (" + s.tools.length + " selected)";
+        lbl.textContent = toolsLabel(s);
+        lbl.style.color = s.tools.length ? "" : "var(--sup)";
       };
       tp.appendChild(b);
     }
@@ -364,8 +384,16 @@ els.baddspec.onclick = () => {
   renderSpecs();
 };
 
+let launchWarned = false;
 els.blaunch.onclick = async () => {
   els.berr.style.display = "none";
+  // Soft guard: launching with zero tools anywhere is almost always a mistake.
+  if (!launchWarned && specs.every(s => s.tools.length === 0)) {
+    launchWarned = true;
+    els.berr.textContent = "No tools selected on any specialist — they would answer from the LLM alone, with no data. Pick tools from the catalogs above, or click Launch again to proceed anyway.";
+    els.berr.style.display = "block";
+    return;
+  }
   els.blaunch.disabled = true; els.blaunch.textContent = "Launching…";
   const r = await fetch("/api/packs", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
