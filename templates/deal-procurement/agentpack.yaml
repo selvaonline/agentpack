@@ -1,0 +1,41 @@
+# agentpack.yaml — procurement sourcing team
+# Same six-role deal lifecycle — sourcing decisions instead of investments.
+name: procurement-deal-team
+description: Procurement sourcing team — vendor scouting, supplier risk, category intel, TCO modeling, spend-portfolio fit, and sourcing recommendations.
+
+supervisor:
+  name: sourcing_lead
+  prompt: ./prompts/supervisor.md
+
+specialists:
+  - name: vendor_scout
+    description: Finds and profiles vendors by category from the supplier base.
+    prompt: ./prompts/vendor_scout.md
+    tools: [search_vendors]
+
+  - name: risk_analyst
+    description: Scores supplier risk — delivery, quality, financial health, single-source exposure.
+    prompt: ./prompts/risk_analyst.md
+    tools: [supplier_risk]
+
+  - name: market_analyst
+    description: Category intelligence — price trends, supplier landscape, switching costs.
+    prompt: ./prompts/market_analyst.md
+    tools: [category_intel]
+
+  - name: financial_modeler
+    description: Models total cost of ownership across contract terms.
+    prompt: ./prompts/financial_modeler.md
+    tools: [tco_model]
+
+  - name: portfolio_manager
+    description: Checks spend-portfolio fit — category concentration and supplier diversification.
+    prompt: ./prompts/portfolio_manager.md
+    tools: [spend_portfolio_fit]
+
+  - name: deal_writer
+    description: Drafts sourcing recommendations and award memos from the team's findings.
+    prompt: ./prompts/deal_writer.md
+    tools: []
+
+tools: ./tools

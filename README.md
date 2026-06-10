@@ -50,6 +50,41 @@ PASS completeness_full_plan  agents=["destination_scout","budget_planner","itine
 PASS honesty_refusal         agents=[]  (off-topic request: no delegation, polite decline)
 ```
 
+## Templates: a full deal team in one command
+
+The starter team is a toy. The deal templates are the product — the same six-role deal lifecycle (**scout → risk → market → financial modeler → portfolio manager → deal writer**) instantiated for three industries:
+
+```bash
+npx agentpack templates                          # list available templates
+npx agentpack init my-fund   --template deal-vc
+npx agentpack init acquisitions --template deal-ma
+npx agentpack init sourcing  --template deal-procurement
+```
+
+| Template | Team | Tools (deterministic demo data — swap for your APIs) |
+|---|---|---|
+| `deal-ma` | M&A acquisition team | target screening, weighted risk scoring, sector multiples, **real DCF math**, portfolio fit |
+| `deal-vc` | VC investment team | deal-flow sourcing, founder/market risk, **TAM/SAM/SOM + dilution math**, fund-thesis fit |
+| `deal-procurement` | Procurement sourcing team | vendor search, supplier risk, category intel, **TCO modeling**, spend concentration |
+| `starter` | Trip-planning team | the gentlest possible introduction |
+
+![M&A deal team mid-run](docs/assets/deal-team-live.png)
+
+*The `deal-ma` template mid-run: Deal Lead delegating across all six roles. Every template ships with its own eval suite — all three pass 9/9.*
+
+### Reshape the team in seconds
+
+The "agent categories" are pure configuration. Remove the portfolio manager? Delete its block from `agentpack.yaml`, restart — 2 seconds. Add an ESG analyst? Add a block, a prompt file, and a tool:
+
+```yaml
+  - name: esg_analyst
+    description: Screens deals for ESG red flags and reporting obligations.
+    prompt: ./prompts/esg_analyst.md
+    tools: [esg_screen]
+```
+
+The supervisor, the network UI, the MCP server, and the eval harness all pick up the new topology automatically — no code changes anywhere.
+
 ## The manifest is the framework
 
 ```yaml
@@ -168,13 +203,17 @@ src/
   mcp.ts              auto-generated MCP server from the registry
   devui.ts            zero-build live network UI
   evals.ts            behavioral eval harness
-  cli.ts              agentpack init / dev / eval
-examples/
-  trip-planner/       the starter team, committed and eval-passing
+  cli.ts              agentpack init / templates / dev / eval
+templates/
+  starter/            trip-planning team — the gentle introduction
+  deal-ma/            M&A acquisition team (6 roles, 7 tools, evals)
+  deal-vc/            VC investment team (6 roles, 6 tools, evals)
+  deal-procurement/   procurement sourcing team (6 roles, 5 tools, evals)
 ```
 
 ## Roadmap
 
+- [ ] More vertical templates (equity research, insurance underwriting, claims triage)
 - [ ] `agentpack eval --judge` — LLM-as-judge scoring (faithfulness, completeness) on top of deterministic checks
 - [ ] Remote MCP servers as tool sources (`tools: mcp://...` in the manifest)
 - [ ] Embeddable network-panel web component for production UIs

@@ -1,0 +1,41 @@
+# agentpack.yaml — venture capital deal team
+# Same six-role deal lifecycle as M&A — different domain, different tools.
+name: vc-deal-team
+description: VC investment team — startup sourcing, founder/market risk, market sizing, round modeling, fund fit, and investment memos.
+
+supervisor:
+  name: investment_lead
+  prompt: ./prompts/supervisor.md
+
+specialists:
+  - name: startup_scout
+    description: Sources startups from the deal flow by stage and sector.
+    prompt: ./prompts/startup_scout.md
+    tools: [search_startups]
+
+  - name: risk_analyst
+    description: Scores founder and execution risk — exits, domain depth, competition, runway.
+    prompt: ./prompts/risk_analyst.md
+    tools: [founder_market_risk]
+
+  - name: market_analyst
+    description: Sizes markets — TAM / SAM / SOM with explicit assumptions.
+    prompt: ./prompts/market_analyst.md
+    tools: [market_sizing]
+
+  - name: financial_modeler
+    description: Models rounds (dilution, post-money) and revenue-multiple valuations.
+    prompt: ./prompts/financial_modeler.md
+    tools: [dilution_model, revenue_multiple_valuation]
+
+  - name: portfolio_manager
+    description: Checks fund thesis fit, stage allocation, and portfolio conflicts.
+    prompt: ./prompts/portfolio_manager.md
+    tools: [fund_fit]
+
+  - name: deal_writer
+    description: Drafts investment memos from the team's findings.
+    prompt: ./prompts/deal_writer.md
+    tools: []
+
+tools: ./tools

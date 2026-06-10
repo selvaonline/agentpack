@@ -1,0 +1,42 @@
+# agentpack.yaml — M&A acquisition deal team
+# The six-role deal lifecycle: source → risk → market → model → fit → memo.
+# Reshape the team by adding/removing a specialist block and restarting.
+name: ma-deal-team
+description: M&A acquisition team — target screening, diligence risk, industry outlook, valuation, portfolio fit, and IC memos.
+
+supervisor:
+  name: deal_lead
+  prompt: ./prompts/supervisor.md
+
+specialists:
+  - name: target_scout
+    description: Screens the acquisition pipeline and pulls full company profiles.
+    prompt: ./prompts/target_scout.md
+    tools: [search_targets, get_company_profile]
+
+  - name: risk_analyst
+    description: Scores diligence risk — churn, leverage, customer concentration, litigation.
+    prompt: ./prompts/risk_analyst.md
+    tools: [score_deal_risk]
+
+  - name: market_analyst
+    description: Industry outlook — sector growth, valuation multiples, headwinds and tailwinds.
+    prompt: ./prompts/market_analyst.md
+    tools: [industry_outlook]
+
+  - name: financial_modeler
+    description: Values targets via DCF and comparable EV/EBITDA multiples.
+    prompt: ./prompts/financial_modeler.md
+    tools: [dcf_valuation, comparable_multiples]
+
+  - name: portfolio_manager
+    description: Assesses strategic fit and synergies against the acquirer's existing portfolio.
+    prompt: ./prompts/portfolio_manager.md
+    tools: [portfolio_fit]
+
+  - name: deal_writer
+    description: Drafts investment-committee memos from the team's findings.
+    prompt: ./prompts/deal_writer.md
+    tools: []
+
+tools: ./tools

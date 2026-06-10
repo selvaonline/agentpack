@@ -1,37 +1,76 @@
 #!/usr/bin/env node
-// agentpack CLI — init / dev / eval
+// agentpack CLI — init / templates / dev / eval
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { parse as parseYaml } from "yaml";
 import { loadManifest } from "./manifest.js";
 import { createServer } from "./server.js";
 import { runEvals } from "./evals.js";
-import { TEMPLATE_FILES } from "./template.js";
 
 const [, , cmd, ...rest] = process.argv;
+
+// Works from dist/cli.js (npm install) and src/cli.ts (repo dev) alike.
+const TEMPLATES_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../templates");
 
 function arg(flag: string): string | undefined {
   const i = rest.indexOf(flag);
   return i >= 0 ? rest[i + 1] : undefined;
 }
 
-function positional(): string | undefined {
-  return rest.find((a) => !a.startsWith("--") && rest[rest.indexOf(a) - 1]?.startsWith("--") !== true);
+function positionals(): string[] {
+  const flagsWithValue = new Set(["--template", "--port", "--api-url", "--only", "--skip"]);
+  const out: string[] = [];
+  for (let i = 0; i < rest.length; i++) {
+    if (rest[i].startsWith("--")) {
+      if (flagsWithValue.has(rest[i])) i++;
+      continue;
+    }
+    out.push(rest[i]);
+  }
+  return out;
+}
+
+function listTemplates(): Array<{ id: string; name: string; description: string }> {
+  return fs.readdirSync(TEMPLATES_ROOT)
+    .filter((d) => fs.existsSync(path.join(TEMPLATES_ROOT, d, "agentpack.yaml")))
+    .map((d) => {
+      const m = parseYaml(fs.readFileSync(path.join(TEMPLATES_ROOT, d, "agentpack.yaml"), "utf-8"));
+      return { id: d, name: m.name || d, description: m.description || "" };
+    });
 }
 
 async function main() {
   switch (cmd) {
+    case "templates": {
+      console.log("Available templates (agentpack init <dir> --template <id>):\n");
+      for (const t of listTemplates()) {
+        console.log(`  ${t.id.padEnd(18)} ${t.description}`);
+      }
+      break;
+    }
+
     case "init": {
-      const dir = path.resolve(rest[0] && !rest[0].startsWith("--") ? rest[0] : "my-agent-team");
+      const dir = path.resolve(positionals()[0] || "my-agent-team");
+      const template = arg("--template") || "starter";
+      const src = path.join(TEMPLATES_ROOT, template);
+      if (!fs.existsSync(path.join(src, "agentpack.yaml"))) {
+        console.error(`Unknown template "${template}". Available: ${listTemplates().map((t) => t.id).join(", ")}`);
+        process.exit(1);
+      }
       if (fs.existsSync(path.join(dir, "agentpack.yaml"))) {
         console.error(`agentpack.yaml already exists in ${dir}`);
         process.exit(1);
       }
-      for (const [rel, contents] of Object.entries(TEMPLATE_FILES)) {
-        const target = path.join(dir, rel);
-        fs.mkdirSync(path.dirname(target), { recursive: true });
-        fs.writeFileSync(target, contents);
-      }
-      console.log(`✓ Created agent team in ${dir}
+      fs.cpSync(src, dir, {
+        recursive: true,
+        // never copy real env files or local artifacts out of a template
+        filter: (p) => {
+          const base = path.basename(p);
+          return base !== "node_modules" && !(base.startsWith(".env") && base !== ".env.example");
+        },
+      });
+      console.log(`✓ Created agent team in ${dir} (template: ${template})
 `);
       console.log(`Next steps:
   cd ${path.relative(process.cwd(), dir) || "."}
@@ -41,7 +80,7 @@ async function main() {
     }
 
     case "dev": {
-      const manifest = rest.find((a) => !a.startsWith("--")) || "agentpack.yaml";
+      const manifest = positionals()[0] || "agentpack.yaml";
       loadDotEnv(path.dirname(path.resolve(manifest)));
       const pack = await loadManifest(manifest);
       const { app, registry } = createServer(pack);
@@ -60,7 +99,7 @@ async function main() {
     }
 
     case "eval": {
-      const cases = rest.find((a) => !a.startsWith("--")) || "evals/cases.json";
+      const cases = positionals()[0] || "evals/cases.json";
       loadDotEnv(process.cwd());
       const apiUrl = arg("--api-url") || `http://localhost:${process.env.PORT || 3000}`;
       const code = await runEvals(path.resolve(cases), apiUrl, {
@@ -74,7 +113,8 @@ async function main() {
       console.log(`agentpack — define your agent team in YAML, get a supervisor + live UI + MCP server + evals
 
 Usage:
-  agentpack init [dir]                   scaffold a working example team
+  agentpack init [dir] --template <id>   scaffold a team (default template: starter)
+  agentpack templates                    list available templates
   agentpack dev [agentpack.yaml]         run the team: dev UI, MCP server, API
       --port <n>                         (default 3000)
   agentpack eval [evals/cases.json]      behavioral evals against a running server
