@@ -297,6 +297,8 @@ async function switchPack(name) {
   els.querybar.style.display = "flex"; els.net.style.display = "block";
   els.answer.style.display = "none"; els.feed.style.display = "none";
   els.hops.textContent = ""; els.timer.textContent = ""; els.dot.className = "dot";
+  // A prompt written for one agent rarely makes sense for another — start fresh.
+  els.q.value = "";
   renderChips();
   await loadNetwork();
 }
