@@ -43,6 +43,7 @@ nav:
       - Integrations (MCP & widget): integrations.md
 
 markdown_extensions:
+  - attr_list
   - admonition
   - pymdownx.highlight
   - pymdownx.superfences
