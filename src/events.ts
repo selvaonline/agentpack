@@ -26,6 +26,13 @@ export function subscribe(runId: string, listener: Listener): () => void {
   };
 }
 
+/** Buffered events from index `after` — backs the polling fallback for
+ * clients whose SSE connection is blocked (ad blockers, buffering proxies). */
+export function getBuffered(runId: string, after = 0): { events: Array<Record<string, unknown>>; next: number } {
+  const buf = buffers.get(runId) || [];
+  return { events: buf.slice(after), next: buf.length };
+}
+
 /** Drop buffers for finished runs after a grace period. */
 export function scheduleCleanup(runId: string, ms = 10 * 60 * 1000): void {
   setTimeout(() => buffers.delete(runId), ms).unref?.();

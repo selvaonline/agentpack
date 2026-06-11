@@ -15,7 +15,7 @@ import path from "node:path";
 import type { AgentPack } from "./types.js";
 import { buildRegistry, networkTopology, ToolRegistry } from "./registry.js";
 import { runSupervisor } from "./supervisor.js";
-import { publish, subscribe, scheduleCleanup, resolveApproval } from "./events.js";
+import { publish, subscribe, scheduleCleanup, resolveApproval, getBuffered } from "./events.js";
 import { mcpRouter } from "./mcp.js";
 import { defaultSupervisorPrompt } from "./manifest.js";
 import { devUiHtml } from "./devui.js";
@@ -472,6 +472,12 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
     const found = resolveApproval(runId, approvalId, Boolean(approve));
     if (!found) { res.status(404).json({ error: "no pending approval with that id" }); return; }
     res.json({ ok: true });
+  });
+
+  // Polling fallback for the same event log — plain JSON, immune to ad
+  // blockers and proxies that break long-lived SSE connections.
+  app.get("/api/runlog/:runId", (req, res) => {
+    res.json(getBuffered(req.params.runId, Number(req.query.after) || 0));
   });
 
   // SSE stream of run events. Primary path is /api/stream/:runId — the older

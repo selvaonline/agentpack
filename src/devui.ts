@@ -605,9 +605,9 @@ async function run() {
   if (tid) sessionStorage.setItem(threadKey, tid);
   currentRunId = runId;
 
-  const es = new EventSource("/api/stream/" + runId);
-  es.onmessage = (m) => {
-    const ev = JSON.parse(m.data);
+  let finished = false, gotEvent = false, pollIv = null, es = null;
+
+  const onEvent = (ev) => {
     if (ev.kind === "hop") { hopCount++; els.hops.textContent = hopCount + " hops"; setActive(ev.target, ev.chain); }
     if (ev.kind === "thinking") feedLine(ev.text);
     if (ev.kind === "tool_executing") feedLine("🔧 " + pretty(ev.toolName) + " executing…");
@@ -624,7 +624,9 @@ async function run() {
     if (ev.kind === "answer_reset") { rawAnswer = ""; els.abody.innerHTML = ""; els.answer.style.display = "none"; }
     if (ev.kind === "answer_chunk") rawAnswer = ev.text;
     if (ev.kind === "run_finished") {
-      es.close();
+      finished = true;
+      if (es) es.close();
+      if (pollIv) clearInterval(pollIv);
       finishRun(ev.ok);
       if (rawAnswer) {
         els.atitle.textContent = "Final Report — " + label(activePack);
@@ -635,6 +637,35 @@ async function run() {
       if (!ev.ok) feedLine("❌ run failed — check server logs");
     }
   };
+
+  // Fallback: poll the buffered event log over plain JSON. Works even when
+  // SSE is blocked by ad blockers, extensions, or buffering proxies.
+  const startPolling = () => {
+    if (pollIv || finished) return;
+    if (es) { es.close(); es = null; }
+    let next = 0, busy = false;
+    pollIv = setInterval(async () => {
+      if (busy || finished) return;
+      busy = true;
+      try {
+        const j = await (await fetch("/api/runlog/" + runId + "?after=" + next)).json();
+        next = j.next;
+        for (const ev of j.events) { if (finished) break; onEvent(ev); }
+      } catch {}
+      busy = false;
+    }, 1200);
+  };
+
+  try {
+    es = new EventSource("/api/stream/" + runId);
+    es.onmessage = (m) => { gotEvent = true; onEvent(JSON.parse(m.data)); };
+    es.onerror = () => { if (es && es.readyState === EventSource.CLOSED) startPolling(); };
+    // run_started is published within ~200ms — if nothing arrived after 3s,
+    // the stream is blocked somewhere between server and browser.
+    setTimeout(() => { if (!gotEvent && !finished) startPolling(); }, 3000);
+  } catch {
+    startPolling();
+  }
 }
 
 function finishRun(ok) {
