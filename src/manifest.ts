@@ -27,6 +27,8 @@ interface Manifest {
   tools?: string | string[];
   /** Example prompts shown as clickable chips in the dev UI. */
   examples?: string[];
+  /** Domain-specific anti-rationalization pairs (added to built-in defaults). */
+  guardrails?: Array<{ excuse: string; rebuttal: string }>;
 }
 
 /** Resolve a prompt field: inline text, or a relative path to a text file. */
@@ -160,5 +162,8 @@ export async function loadManifest(manifestPath: string): Promise<AgentPack> {
     specialists,
     tools,
     examples: Array.isArray(m.examples) ? m.examples.filter((e) => typeof e === "string") : undefined,
+    guardrails: Array.isArray(m.guardrails)
+      ? m.guardrails.filter((g) => g && typeof g.excuse === "string" && typeof g.rebuttal === "string")
+      : undefined,
   };
 }

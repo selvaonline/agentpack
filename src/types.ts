@@ -63,6 +63,9 @@ export interface AgentPack {
   tools: AgentTool[];
   /** Example prompts surfaced as clickable chips in the dev UI. */
   examples?: string[];
+  /** Domain-specific anti-rationalization pairs, appended to the built-in
+   * defaults and compiled into every prompt in the pack. */
+  guardrails?: Array<{ excuse: string; rebuttal: string }>;
 }
 
 /** {nodes, edges} topology for visualization. */

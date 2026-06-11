@@ -40,6 +40,14 @@ cp .env.example .env        # add ONE key: OpenAI, Gemini, or Groq
 npm run dev                 # → http://localhost:3000
 ```
 
+Or skip the template and let AI design the whole project from a description —
+manifest, specialist prompts, tool stubs with realistic sample data, and evals:
+
+```bash
+npx @selvaonline/agentpack init --describe "a restaurant site-selection team: \
+analyze foot traffic and demographics, score competition, recommend the best site"
+```
+
 You now have a working travel-planning team — a supervisor delegating to a destination scout, a budget planner, and an itinerary writer over deterministic demo tools. Ask it:
 
 > *Plan a 5-day trip to Japan in spring on a $3000 budget: research the destination, estimate the costs, and write a day-by-day itinerary.*
@@ -186,6 +194,20 @@ and expire after 24 hours (configurable via `AGENTPACK_PACK_TTL_HOURS`). They co
 *existing* tools only — for custom tools and a permanent setup, scaffold a project with
 `npx @selvaonline/agentpack init` — or disable the feature entirely with `AGENTPACK_DYNAMIC=0`.
 
+### Anti-rationalization guardrails
+
+Agents reliably talk themselves out of doing the work — *"I need more
+information", "the data doesn't cover this exact case"*. Every agentpack prompt
+(supervisor and specialists, including browser-built teams) is compiled with a
+built-in excuse → rebuttal table that shuts these down, and manifests can add
+domain-specific pairs:
+
+```yaml
+guardrails:
+  - excuse: "This metric is an estimate, so I should not quote it"
+    rebuttal: "Quote it and label it as an estimate."
+```
+
 ### Human-in-the-loop approval gates
 
 Mark any specialist `approval: true` in the manifest (or tick the checkbox in the
@@ -309,6 +331,9 @@ templates/
 - [x] Embeddable network-panel web component (`/widget.js`)
 - [x] Streaming token-level answers + live token meter
 - [x] Human-in-the-loop approval gates (`approval: true`)
+- [x] AI-assisted building everywhere: `init --describe` in the CLI, ✨ Generate team in the browser
+- [x] Anti-rationalization guardrails compiled into every prompt (`guardrails:` in the manifest)
+- [x] Agent Skill for coding agents (`skills/build-agent-team`) — scaffold agentpack teams from Claude Code / Cursor / Codex
 - [ ] Persistent conversation memory (Redis/Postgres checkpointer)
 - [ ] OpenTelemetry tracing
 - [ ] Multi-supervisor hierarchies (teams of teams)

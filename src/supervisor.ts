@@ -14,6 +14,7 @@ import type { ToolRegistry } from "./registry.js";
 import { jsonSchemaToZod } from "./jsonSchemaToZod.js";
 import { makeModel, makeSupervisorModel } from "./llm.js";
 import { waitForApproval } from "./events.js";
+import { withGuardrails } from "./guardrails.js";
 
 const pretty = (id: string) => id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -97,7 +98,7 @@ function makeSpecialistTool(
   const agent = createReactAgent({
     llm: model,
     tools: spec.tools.map((t) => makeRegistryTool(pack, registry, t, spec.name, runId, emit, hops)),
-    prompt: spec.prompt,
+    prompt: withGuardrails(spec.prompt, pack.guardrails),
   });
 
   return tool(
@@ -174,7 +175,7 @@ export async function runSupervisor(
   const supervisor = createReactAgent({
     llm: makeSupervisorModel(),
     tools: pack.specialists.map((s) => makeSpecialistTool(pack, registry, s, specialistModel, runId, emit, hops, recordUsage)),
-    prompt: pack.supervisor.prompt,
+    prompt: withGuardrails(pack.supervisor.prompt, pack.guardrails),
     checkpointer,
   });
 

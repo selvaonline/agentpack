@@ -19,7 +19,7 @@ function arg(flag: string): string | undefined {
 }
 
 function positionals(): string[] {
-  const flagsWithValue = new Set(["--template", "--port", "--api-url", "--only", "--skip"]);
+  const flagsWithValue = new Set(["--template", "--port", "--api-url", "--only", "--skip", "--describe"]);
   const out: string[] = [];
   for (let i = 0; i < rest.length; i++) {
     if (rest[i].startsWith("--")) {
@@ -51,15 +51,45 @@ async function main() {
     }
 
     case "init": {
-      const dir = path.resolve(positionals()[0] || "my-agent-team");
+      const describe = arg("--describe");
+      const dir = path.resolve(positionals()[0] || (describe ? "" : "my-agent-team") || "my-agent-team");
+      if (fs.existsSync(path.join(dir, "agentpack.yaml"))) {
+        console.error(`agentpack.yaml already exists in ${dir}`);
+        process.exit(1);
+      }
+
+      if (describe) {
+        // AI scaffold: one sentence → a complete runnable project.
+        loadDotEnv(process.cwd());
+        const { hasLlmKey } = await import("./llm.js");
+        if (!hasLlmKey()) {
+          console.error("init --describe needs an LLM key — set OPENAI_API_KEY, GEMINI_API_KEY, or GROQ_API_KEY (env or ./.env)");
+          process.exit(1);
+        }
+        console.log("✨ Designing your agent team…");
+        const { generateProject } = await import("./scaffold.js");
+        const { name, files } = await generateProject(describe);
+        const target = positionals()[0] ? dir : path.resolve(name);
+        for (const [rel, content] of Object.entries(files)) {
+          const p = path.join(target, rel);
+          fs.mkdirSync(path.dirname(p), { recursive: true });
+          fs.writeFileSync(p, content);
+        }
+        writeProjectPackageJson(target);
+        console.log(`✓ Generated agent team in ${target}\n`);
+        console.log(`  ${Object.keys(files).length + 1} files: manifest, prompts, tool stubs (with sample data), evals\n`);
+        console.log(`Next steps:
+  cd ${path.relative(process.cwd(), target) || "."}
+  npm install
+  cp .env.example .env     # add one LLM key (OpenAI / Gemini / Groq)
+  npm run dev              # live network UI on http://localhost:3000`);
+        break;
+      }
+
       const template = arg("--template") || "starter";
       const src = path.join(TEMPLATES_ROOT, template);
       if (!fs.existsSync(path.join(src, "agentpack.yaml"))) {
         console.error(`Unknown template "${template}". Available: ${listTemplates().map((t) => t.id).join(", ")}`);
-        process.exit(1);
-      }
-      if (fs.existsSync(path.join(dir, "agentpack.yaml"))) {
-        console.error(`agentpack.yaml already exists in ${dir}`);
         process.exit(1);
       }
       fs.cpSync(src, dir, {
@@ -70,21 +100,7 @@ async function main() {
           return base !== "node_modules" && !(base.startsWith(".env") && base !== ".env.example");
         },
       });
-      // A real package.json so `npm run dev` resolves to this framework —
-      // the bare "agentpack" name on npm belongs to someone else.
-      const own = JSON.parse(
-        fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../package.json"), "utf-8")
-      );
-      fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({
-        name: path.basename(dir),
-        private: true,
-        type: "module",
-        scripts: {
-          dev: "agentpack dev",
-          eval: "agentpack eval",
-        },
-        dependencies: { [own.name]: `^${own.version}` },
-      }, null, 2) + "\n");
+      writeProjectPackageJson(dir);
       console.log(`✓ Created agent team in ${dir} (template: ${template})
 `);
       console.log(`Next steps:
@@ -135,6 +151,8 @@ ${teams}
 
 Usage:
   agentpack init [dir] --template <id>   scaffold a team (default template: starter)
+  agentpack init --describe "<text>"     AI-generate a complete team from a description
+                                         (manifest, prompts, tool stubs, evals — needs an LLM key)
   agentpack templates                    list available templates
   agentpack dev [manifest...]            run one or more teams: dev UI, MCP, API
       --port <n>                         (default 3000; multiple manifests get a pack switcher)
@@ -144,6 +162,24 @@ Usage:
 `);
       process.exit(cmd && cmd !== "--help" && cmd !== "-h" ? 1 : 0);
   }
+}
+
+/** A real package.json so `npm run dev` resolves to this framework —
+ * the bare "agentpack" name on npm belongs to someone else. */
+function writeProjectPackageJson(dir: string) {
+  const own = JSON.parse(
+    fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../package.json"), "utf-8")
+  );
+  fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({
+    name: path.basename(dir),
+    private: true,
+    type: "module",
+    scripts: {
+      dev: "agentpack dev",
+      eval: "agentpack eval",
+    },
+    dependencies: { [own.name]: `^${own.version}` },
+  }, null, 2) + "\n");
 }
 
 /** Minimal .env loader (no dependency): KEY=VALUE lines, no expansion. */
