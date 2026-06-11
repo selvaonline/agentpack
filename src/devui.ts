@@ -296,7 +296,8 @@ async function switchPack(name) {
   els.builder.style.display = "none";
   els.querybar.style.display = "flex"; els.net.style.display = "block";
   els.answer.style.display = "none"; els.feed.style.display = "none";
-  els.hops.textContent = ""; els.timer.textContent = ""; els.dot.className = "dot";
+  els.hops.textContent = ""; els.timer.textContent = ""; els.toks.textContent = ""; els.dot.className = "dot";
+  els.approve.style.display = "none";
   // A prompt written for one agent rarely makes sense for another — start fresh.
   els.q.value = "";
   renderChips();
@@ -311,6 +312,7 @@ async function showBuilder() {
   els.net.style.display = "none"; els.feed.style.display = "none"; els.answer.style.display = "none";
   els.builder.style.display = "block";
   els.title.textContent = "Build Your Own";
+  launchWarned = false; // re-arm the zero-tool launch guard per builder visit
   if (!toolCat.length) toolCat = (await (await fetch("/api/toolcatalog")).json()).tools;
   els.packdesc.textContent = "Compose a new agent from " + toolCat.length + " available tools — no code required.";
   if (!specs.length) { prefillSpecs(); renderSpecs(); }
@@ -446,23 +448,29 @@ els.blaunch.onclick = async () => {
     return;
   }
   els.blaunch.disabled = true; els.blaunch.textContent = "Launching…";
-  const r = await fetch("/api/packs", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name: els.bname.value.trim() || "my-agent",
-      description: els.bdesc.value.trim(),
-      supervisor: { instructions: els.bsup.value.trim() },
-      specialists: specs,
-    }) });
-  const j = await r.json().catch(() => ({}));
-  els.blaunch.disabled = false; els.blaunch.textContent = "🚀 Launch agent";
-  if (!r.ok) {
-    els.berr.textContent = (j.problems || [j.error || "launch failed"]).join("\\n");
+  try {
+    const r = await fetch("/api/packs", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: els.bname.value.trim() || "my-agent",
+        description: els.bdesc.value.trim(),
+        supervisor: { instructions: els.bsup.value.trim() },
+        specialists: specs,
+      }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      els.berr.textContent = (j.problems || [j.error || "launch failed"]).join("\\n");
+      els.berr.style.display = "block";
+      return;
+    }
+    allPacks = (await (await fetch("/api/packs")).json()).packs;
+    renderTabs();
+    switchPack(j.name);
+  } catch {
+    els.berr.textContent = "could not reach the server — check your connection and try again";
     els.berr.style.display = "block";
-    return;
+  } finally {
+    els.blaunch.disabled = false; els.blaunch.textContent = "🚀 Launch agent";
   }
-  allPacks = (await (await fetch("/api/packs")).json()).packs;
-  renderTabs();
-  switchPack(j.name);
 };
 
 const slugify = s => s.trim().toLowerCase().replace(/[^a-z0-9-_]+/g, "-").replace(/-{2,}/g, "-").replace(/^[-_]+|[-_]+$/g, "").slice(0, 40);
@@ -596,14 +604,29 @@ async function run() {
 
   const threadKey = "agentpack-thread-" + activePack.name;
   const threadId = sessionStorage.getItem(threadKey) || undefined;
-  const r = await fetch("/api/run", { method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ query, threadId, pack: activePack.name }) });
-  if (r.status === 429) {
+  let runId, tid;
+  try {
+    const r = await fetch("/api/run", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ query, threadId, pack: activePack.name }) });
+    if (r.status === 429) {
+      finishRun(false);
+      feedLine("⏳ Rate limit reached for this demo — try again in a bit.");
+      return;
+    }
+    const j = await r.json();
+    if (!r.ok || !j.runId) {
+      finishRun(false);
+      feedLine("❌ " + (j.error === "unknown pack"
+        ? "This agent has expired — rebuild it from the ＋ Build your own tab."
+        : (j.error || "could not start the run — try again")));
+      return;
+    }
+    runId = j.runId; tid = j.threadId;
+  } catch {
     finishRun(false);
-    feedLine("⏳ Rate limit reached for this demo — try again in a bit.");
+    feedLine("❌ could not reach the server — check your connection and try again");
     return;
   }
-  const { runId, threadId: tid } = await r.json();
   if (tid) sessionStorage.setItem(threadKey, tid);
   currentRunId = runId;
 
