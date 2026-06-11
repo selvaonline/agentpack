@@ -158,6 +158,7 @@ Edit the YAML, restart. That's the whole iteration loop.
 | `GET /api/network` | `{nodes, edges}` team topology |
 | `GET /api/tools` · `POST /api/tools/execute` | Inspect and call any tool directly — **zero tokens**, deterministic, golden-testable |
 | `GET /api/toolcatalog` · `POST /api/packs` | Tool catalog + **build-your-own teams**: compose a new team from loaded tools at runtime, no restart |
+| `POST /api/suggest` | **AI-assisted builder**: `{ description }` → a full team spec (specialists, prompts, tool picks) designed by the LLM |
 | `GET /widget.js` | **Embeddable live network panel** — one script tag drops your team into any web page |
 | `ALL /mcp` | **Auto-generated MCP server** (Streamable HTTP) — connect Claude, Cursor, or any MCP client to your team's tools |
 
@@ -173,6 +174,11 @@ The dev UI ships with a **＋ Build your own** tab: name your team, define speci
 (name, role, system prompt), assign them tools picked from the catalog of everything
 the server has loaded, and hit **Launch** — the team goes live instantly with the full
 network view, its own MCP endpoint at `/mcp/<name>`, and conversation memory.
+
+Or skip the form entirely: type a one-line description of the agent you want
+("a family trip planner: research destinations and weather, then budget the whole
+group") and hit **✨ Generate team** — the AI designs the specialists, writes their
+prompts, and picks matching tools from the catalog. Review, tweak, launch.
 One click exports your design as a ready-to-run `agentpack.yaml`.
 
 Browser-built teams persist across restarts, are **shareable by URL** (`/?pack=<name>`),
