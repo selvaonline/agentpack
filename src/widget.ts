@@ -81,7 +81,7 @@ button:disabled{opacity:.5;cursor:default}
       .then(function(r){ return r.json(); })
       .then(function(j){
         if (!j.runId) throw new Error(j.error || "run failed");
-        var es = new EventSource(base + "/events/" + j.runId);
+        var es = new EventSource(base + "/api/stream/" + j.runId);
         es.onmessage = function(m){
           var ev = JSON.parse(m.data);
           if (ev.kind === "hop" && ev.targetType === "specialist" && nodes[ev.target]) {

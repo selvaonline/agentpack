@@ -3,7 +3,7 @@
 //   GET  /api/health          { ok } when an LLM key is configured
 //   GET  /api/network         {nodes, edges} topology
 //   POST /api/run             { query, threadId? } -> { runId, threadId }
-//   GET  /events/:runId       SSE stream of run events
+//   GET  /api/stream/:runId   SSE stream of run events (/events/:runId alias)
 //   GET  /api/tools           tool registry (schemas)
 //   POST /api/tools/execute   zero-token direct tool execution
 //   ALL  /mcp                 auto-generated MCP server
@@ -474,7 +474,10 @@ export function createServer(packOrPacks: AgentPack | AgentPack[]): AgentpackSer
     res.json({ ok: true });
   });
 
-  app.get("/events/:runId", (req, res) => {
+  // SSE stream of run events. Primary path is /api/stream/:runId — the older
+  // /events/:runId alias is kept for compatibility but ad-blocker filter lists
+  // often block URLs containing "events", silently breaking the live UI.
+  app.get(["/api/stream/:runId", "/events/:runId"], (req, res) => {
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");

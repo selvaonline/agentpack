@@ -153,7 +153,7 @@ Edit the YAML, restart. That's the whole iteration loop.
 |---|---|
 | `GET /` | Dev UI — live network graph, token streaming, hop animation, event feed, light/dark themes |
 | `POST /api/run` | Run a query (`{ query, threadId? }` → `{ runId }`); follow-ups on the same `threadId` keep conversation memory |
-| `GET /events/:runId` | SSE stream — `hop`, `tool_executing`, `agent_step`, `answer_token`, `usage`, `approval_request`, … |
+| `GET /api/stream/:runId` | SSE stream — `hop`, `tool_executing`, `agent_step`, `answer_token`, `usage`, `approval_request`, … (`/events/:runId` works too) |
 | `POST /api/approve` | Resolve a human-in-the-loop gate (`{ runId, approvalId, approve }`) |
 | `GET /api/network` | `{nodes, edges}` team topology |
 | `GET /api/tools` · `POST /api/tools/execute` | Inspect and call any tool directly — **zero tokens**, deterministic, golden-testable |

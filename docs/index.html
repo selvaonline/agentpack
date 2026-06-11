@@ -157,7 +157,7 @@ npm run eval</code></pre>
       <tr><th>Endpoint</th><th>What it does</th></tr>
       <tr><td><code>GET /</code></td><td>Dev UI — network panel, pack switcher, builder</td></tr>
       <tr><td><code>POST /api/run</code></td><td>Start a run: <code>{ query, pack?, threadId? }</code> → <code>{ runId }</code></td></tr>
-      <tr><td><code>GET /events/:runId</code></td><td>SSE stream: hops, tool calls, tokens, usage, approvals</td></tr>
+      <tr><td><code>GET /api/stream/:runId</code></td><td>SSE stream: hops, tool calls, tokens, usage, approvals</td></tr>
       <tr><td><code>POST /api/approve</code></td><td>Resolve a human-in-the-loop gate</td></tr>
       <tr><td><code>POST /api/packs</code></td><td>Create a custom team from the browser builder</td></tr>
       <tr><td><code>POST /api/suggest</code></td><td>AI-assisted builder: a description in, a full team spec out</td></tr>

@@ -605,7 +605,7 @@ async function run() {
   if (tid) sessionStorage.setItem(threadKey, tid);
   currentRunId = runId;
 
-  const es = new EventSource("/events/" + runId);
+  const es = new EventSource("/api/stream/" + runId);
   es.onmessage = (m) => {
     const ev = JSON.parse(m.data);
     if (ev.kind === "hop") { hopCount++; els.hops.textContent = hopCount + " hops"; setActive(ev.target, ev.chain); }

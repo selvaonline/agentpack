@@ -43,7 +43,7 @@ async function runQuery(apiUrl: string, query: string, timeoutS: number): Promis
 
   const out: RunResult = { specialists: [], toolCalls: {}, answer: "", ok: null, durationS: 0 };
   const t0 = Date.now();
-  const res = await fetch(`${apiUrl}/events/${runId}`, { signal: AbortSignal.timeout((timeoutS * 2 + 60) * 1000) });
+  const res = await fetch(`${apiUrl}/api/stream/${runId}`, { signal: AbortSignal.timeout((timeoutS * 2 + 60) * 1000) });
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let buf = "";
