@@ -572,7 +572,14 @@ function setActive(id, chain) {
 // ── runs ────────────────────────────────────────────────────────────────────
 async function run() {
   const query = els.q.value.trim();
-  if (!query || running) return;
+  if (!query) {
+    // Make the empty-input state obvious instead of silently doing nothing.
+    els.q.focus();
+    els.q.style.borderColor = "var(--err)";
+    setTimeout(() => els.q.style.borderColor = "", 900);
+    return;
+  }
+  if (running) return;
   running = true; rawAnswer = "";
   els.go.disabled = true; els.go.textContent = "Running…";
   els.dot.className = "dot run";
