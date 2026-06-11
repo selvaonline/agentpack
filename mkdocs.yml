@@ -1,0 +1,58 @@
+site_name: agentpack
+site_description: "Define your agent team in YAML — get a supervisor, live network UI, MCP server, and evals out of the box."
+site_url: https://selvaonline.github.io/agentpack/
+repo_url: https://github.com/selvaonline/agentpack
+repo_name: selvaonline/agentpack
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: amber
+      accent: light blue
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: amber
+      accent: light blue
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.footer
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Guide:
+      - The manifest: manifest.md
+      - Templates: templates.md
+      - AI-assisted building: ai-builder.md
+      - Guardrails: guardrails.md
+      - Evals: evals.md
+  - Reference:
+      - HTTP API: api.md
+      - Integrations (MCP & widget): integrations.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/selvaonline/agentpack
+    - icon: fontawesome/brands/npm
+      link: https://www.npmjs.com/package/@selvaonline/agentpack

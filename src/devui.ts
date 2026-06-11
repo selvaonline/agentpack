@@ -87,6 +87,9 @@ header .right{margin-left:auto;display:flex;align-items:center;gap:10px;font-siz
   padding:10px 16px;font-size:.82rem;cursor:pointer;transition:all .15s}
 .baction .ghost:hover{color:var(--spec);border-color:var(--spec)}
 .berr{color:var(--err);font-size:.8rem;margin-top:10px;white-space:pre-line;display:none}
+.doclink{border:1px solid var(--line);background:var(--panel);color:var(--dim);border-radius:8px;
+  padding:4px 11px;font-size:.78rem;text-decoration:none;line-height:1.4;transition:all .15s}
+.doclink:hover{color:var(--spec);border-color:var(--spec)}
 .theme{border:1px solid var(--line);background:var(--panel);color:var(--dim);border-radius:8px;
   padding:3px 9px;font-size:.85rem;cursor:pointer;line-height:1.4;transition:all .15s}
 .theme:hover{color:var(--txt);border-color:var(--spec)}
@@ -166,6 +169,7 @@ footer a{color:var(--spec);text-decoration:none}
     <h1 id="title">${esc(title)}</h1>
     <span class="fw">⚡ agentpack</span>
     <span class="right"><span class="dot" id="dot"></span><span id="stats"></span>
+      <a class="doclink" href="https://selvaonline.github.io/agentpack/" target="_blank" rel="noopener">Docs</a>
       <button class="theme" id="theme" title="Toggle light/dark theme">🌙</button></span>
   </header>
 
